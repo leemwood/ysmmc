@@ -62,6 +62,8 @@ const handleSubmit = async () => {
       errorMsg.value = '该邮箱已被注册'
     } else if (e.message.includes('Password should be at least')) {
       errorMsg.value = '密码长度不能少于6位'
+    } else if (e.message.includes('Error sending confirmation email')) {
+      errorMsg.value = '发送验证邮件失败。请联系管理员检查邮件服务配置。'
     } else {
       errorMsg.value = e.message || '操作失败，请稍后重试'
     }
