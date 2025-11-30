@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /profile
+Disallow: /upload
+
+Sitemap: https://ysmmc.cn/sitemap.xml
