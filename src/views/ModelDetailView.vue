@@ -61,12 +61,17 @@ const fetchModel = async () => {
 
 const checkFavoriteStatus = async () => {
   if (!userStore.user || !model.value) return
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('favorites')
     .select('id')
     .eq('user_id', userStore.user.id)
     .eq('model_id', model.value.id)
-    .single()
+    .maybeSingle()
+  
+  if (error) {
+    console.error('Error checking favorite status:', error)
+    return
+  }
   isFavorited.value = !!data
 }
 
