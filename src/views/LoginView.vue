@@ -32,22 +32,39 @@ const handleSubmit = async () => {
         email: email.value,
         password: password.value
       })
-      if (error) throw new Error('登录失败，请检查邮箱和密码')
+      if (error) throw error
     } else {
       // Registration: Email & Password only
       const { error } = await supabase.auth.signUp({
         email: email.value,
         password: password.value
       })
-      if (error) throw new Error('注册失败，请稍后重试')
+      if (error) throw error
       
       // No manual profile creation here, rely on trigger to set random username
+      if (!error) {
+        alert('注册成功！请前往您的邮箱确认验证邮件，然后登录。')
+        isLogin.value = true
+        return
+      }
     }
     
     await userStore.fetchUser()
     router.push('/')
   } catch (e: any) {
-    errorMsg.value = e.message
+    console.error('Auth error:', e)
+    // Translate common Supabase errors to Chinese
+    if (e.message.includes('Invalid login credentials')) {
+      errorMsg.value = '邮箱或密码错误'
+    } else if (e.message.includes('Email not confirmed')) {
+      errorMsg.value = '请先前往邮箱确认您的注册邮件'
+    } else if (e.message.includes('User already registered')) {
+      errorMsg.value = '该邮箱已被注册'
+    } else if (e.message.includes('Password should be at least')) {
+      errorMsg.value = '密码长度不能少于6位'
+    } else {
+      errorMsg.value = e.message || '操作失败，请稍后重试'
+    }
   } finally {
     loading.value = false
   }
