@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '../supabase/client'
 import { useUserStore } from '../stores/user'
-import { Upload, X, Save, ArrowLeft } from 'lucide-vue-next'
+import { Upload, X, ArrowLeft } from 'lucide-vue-next'
 import { useHead } from '@vueuse/head'
 import type { Model } from '../types'
 

@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { supabase } from '../supabase/client'
-import { User as UserIcon, Package, Heart, Grid, Image } from 'lucide-vue-next'
+import { User as UserIcon, Package, Heart } from 'lucide-vue-next'
 import { useHead } from '@vueuse/head'
 import type { Model, Profile } from '../types'
 

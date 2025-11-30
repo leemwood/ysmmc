@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { supabase } from '../supabase/client'
-import { Search, Download, Heart, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { Search, Download, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { useHead } from '@vueuse/head'
 import type { Model } from '../types'
 

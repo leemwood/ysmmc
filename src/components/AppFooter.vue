@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Github, Heart, MessageCircle } from 'lucide-vue-next'
+import { Github, Heart } from 'lucide-vue-next'
 </script>
 
 <template>

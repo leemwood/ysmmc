@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { supabase } from '../supabase/client'
-import { Check, X, AlertCircle, User, Box } from 'lucide-vue-next'
+import { Check, X, User, Box } from 'lucide-vue-next'
 import { useHead } from '@vueuse/head'
 import type { Model, Profile } from '../types'
 

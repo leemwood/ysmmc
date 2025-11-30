@@ -52,7 +52,7 @@ const router = createRouter({
   ]
 })
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const userStore = useUserStore()
   if (userStore.loading) {
     await userStore.fetchUser()

@@ -18,7 +18,7 @@ useHead({
 const isLogin = ref(true)
 const email = ref('')
 const password = ref('')
-const username = ref('')
+// const username = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 

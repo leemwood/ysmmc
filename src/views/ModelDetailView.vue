@@ -148,10 +148,10 @@ const handleDelete = async () => {
     // Delete file from storage
     // Note: We should probably delete the file, but for simplicity just deleting the record is often enough if we have cascading deletes or clean up scripts.
     // But let's try to delete the file.
-    if (model.value.file_path) {
+    if (model.value?.file_path) {
         await supabase.storage.from('models').remove([model.value.file_path])
     }
-    if (model.value.image_url) {
+    if (model.value?.image_url) {
         // Extract path from URL if possible, or just ignore for now as image_url is public URL
         // Ideally we store image_path separately.
     }
@@ -159,7 +159,7 @@ const handleDelete = async () => {
     const { error } = await supabase
       .from('models')
       .delete()
-      .eq('id', model.value.id)
+      .eq('id', model.value?.id)
 
     if (error) throw error
     
