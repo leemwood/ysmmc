@@ -1,0 +1,24 @@
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f9fafb;">
+  <div style="max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); overflow: hidden; border: 1px solid #e5e7eb;">
+    <div style="background-color: #4f46e5; padding: 24px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">欢迎加入 YSM 模型站</h1>
+    </div>
+    <div style="padding: 32px 24px;">
+      <h2 style="margin-top: 0;">您好！</h2>
+      <p>感谢您注册 YSM 模型站 (YSM Model Hub)。</p>
+      <p>为了保证您的账户安全并启用完整功能，请点击下方的按钮验证您的电子邮件地址：</p>
+      
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="{{ .ConfirmationURL }}" style="display: inline-block; background-color: #4f46e5; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600;">确认注册</a>
+      </div>
+      
+      <p>如果您无法点击上面的按钮，请将以下链接复制并粘贴到浏览器的地址栏中：</p>
+      <p><a href="{{ .ConfirmationURL }}" style="color: #4f46e5; word-break: break-all;">{{ .ConfirmationURL }}</a></p>
+      
+      <p>如果您没有注册此账户，请忽略此邮件。</p>
+    </div>
+    <div style="background-color: #f3f4f6; padding: 16px; text-align: center; font-size: 12px; color: #6b7280;">
+      <p style="margin: 0;">&copy; YSM Model Hub. All rights reserved.</p>
+    </div>
+  </div>
+</div>
