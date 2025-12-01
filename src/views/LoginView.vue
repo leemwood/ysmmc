@@ -94,7 +94,10 @@ const handleSubmit = async () => {
         </div>
 
         <div class="form-group">
-          <label for="password">密码</label>
+          <div class="label-row">
+            <label for="password">密码</label>
+            <router-link v-if="isLogin" to="/reset-password" class="forgot-link">忘记密码？</router-link>
+          </div>
           <input 
             id="password" 
             v-model="password" 
@@ -162,10 +165,26 @@ const handleSubmit = async () => {
   flex-direction: column;
   gap: $spacing-sm;
 
+  .label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
   label {
     font-weight: 500;
     font-size: 0.875rem;
     color: var(--color-text-main);
+  }
+
+  .forgot-link {
+    font-size: 0.875rem;
+    color: var(--color-primary);
+    text-decoration: none;
+    
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 
