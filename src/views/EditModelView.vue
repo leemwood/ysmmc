@@ -56,8 +56,8 @@ const fetchModel = async () => {
     return
   }
 
-  // Verify ownership
-  if (data.user_id !== userStore.user?.id) {
+  // Verify ownership or admin
+  if (data.user_id !== userStore.user?.id && !userStore.isAdmin) {
     router.push('/')
     return
   }
@@ -166,17 +166,32 @@ const handleSubmit = async () => {
     }
 
     // 3. Update Database
-    const { error } = await supabase
-      .from('models')
-      .update({
+    let updatePayload: any = {}
+    
+    if (userStore.isAdmin) {
+      // Admin updates directly
+      updatePayload = {
+        ...changes,
+        update_status: 'idle',
+        pending_changes: null,
+        updated_at: new Date().toISOString()
+      }
+    } else {
+      // User updates via pending_changes
+      updatePayload = {
         pending_changes: changes,
         update_status: 'pending_review'
-      })
+      }
+    }
+
+    const { error } = await supabase
+      .from('models')
+      .update(updatePayload)
       .eq('id', model.value.id)
 
     if (error) throw error
 
-    successMsg.value = '更新请求已提交，请等待管理员审核。'
+    successMsg.value = userStore.isAdmin ? '模型更新成功！' : '更新请求已提交，请等待管理员审核。'
     // Optionally redirect after delay
     setTimeout(() => {
       router.push(`/model/${model.value?.id}`)

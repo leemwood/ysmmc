@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { supabase } from '../supabase/client'
-import { Check, X, User, Box } from 'lucide-vue-next'
+import { Check, X, User, Box, Search, Trash2, Shield, ShieldAlert, Edit, Users, FolderTree } from 'lucide-vue-next'
 import { useHead } from '@vueuse/head'
 import type { Model, Profile } from '../types'
 
@@ -12,18 +12,42 @@ useHead({
   ]
 })
 
-const activeTab = ref<'models' | 'profiles'>('models')
+const activeTab = ref<'audit_models' | 'audit_profiles' | 'manage_models' | 'manage_users'>('audit_models')
 
 const pendingModels = ref<Model[]>([])
 const pendingProfiles = ref<Profile[]>([])
+const allModels = ref<Model[]>([])
+const allProfiles = ref<Profile[]>([])
 const loading = ref(true)
+
+// Search filters
+const modelSearch = ref('')
+const userSearch = ref('')
+
+const filteredModels = computed(() => {
+  if (!modelSearch.value) return allModels.value
+  const query = modelSearch.value.toLowerCase()
+  return allModels.value.filter(m => 
+    m.title.toLowerCase().includes(query) || 
+    m.profiles?.username?.toLowerCase().includes(query)
+  )
+})
+
+const filteredProfiles = computed(() => {
+  if (!userSearch.value) return allProfiles.value
+  const query = userSearch.value.toLowerCase()
+  return allProfiles.value.filter(p => 
+    p.username.toLowerCase().includes(query) || 
+    p.id.toLowerCase().includes(query)
+  )
+})
 
 const fetchPendingModels = async () => {
   loading.value = true
   const { data, error } = await supabase
     .from('models')
     .select('*, profiles(username)')
-    .or('status.eq.pending,update_status.eq.pending_review') // Fetch pending new OR pending updates
+    .or('status.eq.pending,update_status.eq.pending_review')
     .order('created_at', { ascending: false })
 
   if (error) console.error(error)
@@ -41,6 +65,30 @@ const fetchPendingProfiles = async () => {
 
   if (error) console.error(error)
   else pendingProfiles.value = data as any
+  loading.value = false
+}
+
+const fetchAllModels = async () => {
+  loading.value = true
+  const { data, error } = await supabase
+    .from('models')
+    .select('*, profiles(username)')
+    .order('created_at', { ascending: false })
+
+  if (error) console.error(error)
+  else allModels.value = data as any
+  loading.value = false
+}
+
+const fetchAllProfiles = async () => {
+  loading.value = true
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) console.error(error)
+  else allProfiles.value = data as any
   loading.value = false
 }
 
@@ -112,6 +160,21 @@ const handleRejectModel = async (model: Model) => {
   }
 }
 
+const handleDeleteModel = async (id: string) => {
+  if (!confirm('确定要永久删除此模型吗？此操作不可撤销。')) return
+
+  const { error } = await supabase
+    .from('models')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    alert('删除失败: ' + error.message)
+  } else {
+    allModels.value = allModels.value.filter(m => m.id !== id)
+  }
+}
+
 const handleApproveProfile = async (profile: Profile) => {
   if (!profile.pending_changes) return
 
@@ -139,7 +202,7 @@ const handleRejectProfile = async (id: string) => {
   const { error } = await supabase
     .from('profiles')
     .update({ 
-      profile_status: 'approved', // Revert status to approved but keep old data
+      profile_status: 'approved',
       pending_changes: null 
     })
     .eq('id', id)
@@ -149,10 +212,41 @@ const handleRejectProfile = async (id: string) => {
   }
 }
 
-const switchTab = (tab: 'models' | 'profiles') => {
+const handleUpdateUserRole = async (id: string, newRole: 'user' | 'admin') => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ role: newRole })
+    .eq('id', id)
+
+  if (error) {
+    alert('角色更新失败: ' + error.message)
+  } else {
+    const user = allProfiles.value.find(p => p.id === id)
+    if (user) user.role = newRole
+  }
+}
+
+const handleDeleteUser = async (id: string) => {
+  if (!confirm('确定要删除此用户资料吗？(注意：这不会删除其 Auth 账号，仅删除资料表记录)')) return
+
+  const { error } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    alert('删除失败: ' + error.message)
+  } else {
+    allProfiles.value = allProfiles.value.filter(p => p.id !== id)
+  }
+}
+
+const switchTab = (tab: typeof activeTab.value) => {
   activeTab.value = tab
-  if (tab === 'models') fetchPendingModels()
-  else fetchPendingProfiles()
+  if (tab === 'audit_models') fetchPendingModels()
+  else if (tab === 'audit_profiles') fetchPendingProfiles()
+  else if (tab === 'manage_models') fetchAllModels()
+  else if (tab === 'manage_users') fetchAllProfiles()
 }
 
 onMounted(() => {
@@ -169,18 +263,30 @@ onMounted(() => {
 
     <div class="tabs">
       <button 
-        @click="switchTab('models')" 
-        :class="['tab-btn', activeTab === 'models' ? 'active' : '']"
+        @click="switchTab('audit_models')" 
+        :class="['tab-btn', activeTab === 'audit_models' ? 'active' : '']"
       >
-        <Box :size="18" /> 模型审核
+        <FolderTree :size="18" /> 模型审核
         <span v-if="pendingModels.length" class="badge">{{ pendingModels.length }}</span>
       </button>
       <button 
-        @click="switchTab('profiles')" 
-        :class="['tab-btn', activeTab === 'profiles' ? 'active' : '']"
+        @click="switchTab('audit_profiles')" 
+        :class="['tab-btn', activeTab === 'audit_profiles' ? 'active' : '']"
       >
         <User :size="18" /> 资料审核
         <span v-if="pendingProfiles.length" class="badge">{{ pendingProfiles.length }}</span>
+      </button>
+      <button 
+        @click="switchTab('manage_models')" 
+        :class="['tab-btn', activeTab === 'manage_models' ? 'active' : '']"
+      >
+        <Box :size="18" /> 模型管理
+      </button>
+      <button 
+        @click="switchTab('manage_users')" 
+        :class="['tab-btn', activeTab === 'manage_users' ? 'active' : '']"
+      >
+        <Users :size="18" /> 用户管理
       </button>
     </div>
 
@@ -188,8 +294,8 @@ onMounted(() => {
       正在加载...
     </div>
 
-    <!-- Models List -->
-    <div v-else-if="activeTab === 'models'">
+    <!-- Models Audit List -->
+    <div v-else-if="activeTab === 'audit_models'">
       <div v-if="pendingModels.length === 0" class="empty-state">
         <div class="empty-icon">
           <Check :size="48" />
@@ -247,8 +353,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Profiles List -->
-    <div v-else-if="activeTab === 'profiles'">
+    <!-- Profiles Audit List -->
+    <div v-else-if="activeTab === 'audit_profiles'">
       <div v-if="pendingProfiles.length === 0" class="empty-state">
         <div class="empty-icon">
           <Check :size="48" />
@@ -294,6 +400,130 @@ onMounted(() => {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Model Management List -->
+    <div v-else-if="activeTab === 'manage_models'">
+      <div class="management-toolbar">
+        <div class="search-box">
+          <Search :size="18" />
+          <input v-model="modelSearch" type="text" placeholder="搜索模型标题或作者...">
+        </div>
+      </div>
+
+      <div class="management-table-wrapper">
+        <table class="management-table">
+          <thead>
+            <tr>
+              <th>预览</th>
+              <th>标题</th>
+              <th>作者</th>
+              <th>状态</th>
+              <th>下载</th>
+              <th>上传日期</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="model in filteredModels" :key="model.id">
+              <td>
+                <img :src="model.image_url || 'https://via.placeholder.com/40x30'" class="table-preview">
+              </td>
+              <td class="td-title">{{ model.title }}</td>
+              <td>{{ model.profiles?.username || '未知' }}</td>
+              <td>
+                <span :class="['status-badge', model.status]">
+                  {{ model.status === 'approved' ? '已通过' : model.status === 'pending' ? '待审核' : '已拒绝' }}
+                </span>
+              </td>
+              <td>{{ model.downloads }}</td>
+              <td>{{ new Date(model.created_at).toLocaleDateString() }}</td>
+              <td>
+                <div class="table-actions">
+                  <router-link :to="`/model/${model.id}/edit`" class="action-btn" title="编辑">
+                    <Edit :size="18" />
+                  </router-link>
+                  <button @click="handleDeleteModel(model.id)" class="action-btn danger" title="删除">
+                    <Trash2 :size="18" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- User Management List -->
+    <div v-else-if="activeTab === 'manage_users'">
+      <div class="management-toolbar">
+        <div class="search-box">
+          <Search :size="18" />
+          <input v-model="userSearch" type="text" placeholder="搜索用户名或 ID...">
+        </div>
+      </div>
+
+      <div class="management-table-wrapper">
+        <table class="management-table">
+          <thead>
+            <tr>
+              <th>头像</th>
+              <th>用户名</th>
+              <th>角色</th>
+              <th>状态</th>
+              <th>注册日期</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="profile in filteredProfiles" :key="profile.id">
+              <td>
+                <img :src="profile.avatar_url || 'https://via.placeholder.com/32'" class="table-avatar">
+              </td>
+              <td>
+                <div class="user-info-cell">
+                  <span class="username">{{ profile.username }}</span>
+                  <span class="user-id">{{ profile.id }}</span>
+                </div>
+              </td>
+              <td>
+                <span :class="['role-badge', profile.role]">
+                  {{ profile.role === 'admin' ? '管理员' : '普通用户' }}
+                </span>
+              </td>
+              <td>
+                <span :class="['status-badge', profile.profile_status]">
+                  {{ profile.profile_status === 'approved' ? '正常' : '待审核' }}
+                </span>
+              </td>
+              <td>{{ new Date(profile.created_at).toLocaleDateString() }}</td>
+              <td>
+                <div class="table-actions">
+                  <button 
+                    v-if="profile.role === 'user'" 
+                    @click="handleUpdateUserRole(profile.id, 'admin')" 
+                    class="action-btn success" 
+                    title="设为管理员"
+                  >
+                    <Shield :size="18" />
+                  </button>
+                  <button 
+                    v-else 
+                    @click="handleUpdateUserRole(profile.id, 'user')" 
+                    class="action-btn warning" 
+                    title="取消管理员"
+                  >
+                    <ShieldAlert :size="18" />
+                  </button>
+                  <button @click="handleDeleteUser(profile.id)" class="action-btn danger" title="删除资料">
+                    <Trash2 :size="18" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -531,5 +761,190 @@ onMounted(() => {
 .empty-icon {
   color: var(--color-secondary);
   margin-bottom: $spacing-md;
+}
+
+// Management styles
+.management-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: $spacing-lg;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  background-color: white;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+  padding: 0 $spacing-md;
+  width: 300px;
+  
+  &:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba($color-primary, 0.1);
+  }
+  
+  input {
+    border: none;
+    outline: none;
+    padding: $spacing-sm 0;
+    width: 100%;
+    font-size: 0.875rem;
+  }
+  
+  color: var(--color-text-muted);
+}
+
+.management-table-wrapper {
+  background-color: white;
+  border-radius: $radius-lg;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+.management-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+  
+  th {
+    background-color: #f9fafb;
+    padding: $spacing-md;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border);
+  }
+  
+  td {
+    padding: $spacing-md;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+  }
+  
+  tr:last-child td {
+    border-bottom: none;
+  }
+  
+  .table-preview {
+    width: 40px;
+    height: 30px;
+    object-fit: cover;
+    border-radius: $radius-sm;
+  }
+  
+  .table-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  
+  .td-title {
+    font-weight: 500;
+    color: var(--color-text-main);
+  }
+}
+
+.user-info-cell {
+  display: flex;
+  flex-direction: column;
+  
+  .username {
+    font-weight: 500;
+    color: var(--color-text-main);
+  }
+  
+  .user-id {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: $radius-full;
+  font-size: 0.75rem;
+  font-weight: 500;
+  
+  &.approved {
+    background-color: #ecfdf5;
+    color: #065f46;
+  }
+  
+  &.pending, &.pending_review {
+    background-color: #fffbeb;
+    color: #92400e;
+  }
+  
+  &.rejected {
+    background-color: #fef2f2;
+    color: #991b1b;
+  }
+}
+
+.role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: $radius-full;
+  font-size: 0.75rem;
+  font-weight: 500;
+  
+  &.admin {
+    background-color: #eef2ff;
+    color: #3730a3;
+  }
+  
+  &.user {
+    background-color: #f3f4f6;
+    color: #374151;
+  }
+}
+
+.table-actions {
+  display: flex;
+  gap: $spacing-xs;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border);
+  background-color: white;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: $transition-base;
+  text-decoration: none;
+  
+  &:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background-color: #f5f3ff;
+  }
+  
+  &.danger:hover {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+    background-color: #fef2f2;
+  }
+  
+  &.success:hover {
+    color: var(--color-secondary);
+    border-color: var(--color-secondary);
+    background-color: #ecfdf5;
+  }
+  
+  &.warning:hover {
+    color: #d97706;
+    border-color: #d97706;
+    background-color: #fffbeb;
+  }
 }
 </style>
