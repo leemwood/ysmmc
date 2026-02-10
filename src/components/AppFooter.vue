@@ -11,30 +11,30 @@ import { Github, Heart } from 'lucide-vue-next'
           <p>你的 Minecraft Yes Steve Model 模型库</p>
         </div>
         
-        <div class="footer__links">
+        <nav class="footer__links" aria-label="页脚导航">
           <div class="footer__column">
             <h4>链接</h4>
-            <a href="/" class="footer__link">首页</a>
-            <a href="/upload" class="footer__link">上传模型</a>
+            <RouterLink to="/" class="footer__link">首页</RouterLink>
+            <RouterLink to="/upload" class="footer__link">上传模型</RouterLink>
           </div>
           
           <div class="footer__column">
             <h4>关于</h4>
-            <a href="https://github.com/leemwood/ysmmc" target="_blank" class="footer__link">
-              <Github :size="16" /> GitHub
+            <a href="https://github.com/leemwood/ysmmc" target="_blank" class="footer__link" rel="noopener noreferrer">
+              <Github :size="16" aria-hidden="true" /> GitHub
             </a>
           </div>
 
           <div class="footer__column">
             <h4>社区</h4>
-            <a href="https://qm.qq.com/q/fLG2Sc3yU2" target="_blank" class="footer__link" title="YSM 免费模型站用户群">
-              <img src="/Tencent_QQ-Logo.wine.svg" alt="QQ" class="icon-img" /> YSM 用户群
+            <a href="https://qm.qq.com/q/fLG2Sc3yU2" target="_blank" class="footer__link" title="YSM 免费模型站用户群" rel="noopener noreferrer">
+              <img src="/Tencent_QQ-Logo.wine.svg" alt="QQ" class="icon-img" aria-hidden="true" /> YSM 用户群
             </a>
-            <a href="https://qm.qq.com/q/Gjs81js8YC" target="_blank" class="footer__link" title="Fold Craft Launcher玩家交流群①">
-              <img src="/Tencent_QQ-Logo.wine.svg" alt="QQ" class="icon-img" /> FCL 玩家群
+            <a href="https://qm.qq.com/q/Gjs81js8YC" target="_blank" class="footer__link" title="Fold Craft Launcher玩家交流群①" rel="noopener noreferrer">
+              <img src="/Tencent_QQ-Logo.wine.svg" alt="QQ" class="icon-img" aria-hidden="true" /> FCL 玩家群
             </a>
           </div>
-        </div>
+        </nav>
       </div>
       
       <div class="footer__bottom">

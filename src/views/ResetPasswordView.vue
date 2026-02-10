@@ -48,9 +48,11 @@ const handleResetPassword = async () => {
     <div class="card auth-card">
       <h1 class="auth-title">重置密码</h1>
       
-      <div v-if="isSuccess" class="success-message">
-        <p>{{ message }}</p>
-        <p class="tip">请点击邮件中的链接来设置新密码。</p>
+      <div v-if="isSuccess" class="success-message" role="status" aria-live="polite">
+        <div class="msg-content">
+          <p>{{ message }}</p>
+          <p class="tip">请点击邮件中的链接来设置新密码。</p>
+        </div>
       </div>
 
       <form v-else @submit.prevent="handleResetPassword" class="auth-form">
@@ -65,15 +67,21 @@ const handleResetPassword = async () => {
             class="input" 
             required 
             placeholder="请输入邮箱地址"
+            aria-required="true"
           >
         </div>
 
-        <div v-if="errorMsg" class="error-message">
-          {{ errorMsg }}
+        <div v-if="errorMsg" class="error-message" role="alert" aria-live="polite">
+          <ShieldAlert :size="18" aria-hidden="true" /> {{ errorMsg }}
         </div>
 
-        <button type="submit" class="btn btn--primary" :disabled="loading">
-          {{ loading ? '发送中...' : '发送重置邮件' }}
+        <button type="submit" class="btn btn--primary" :disabled="loading" :aria-busy="loading">
+          <template v-if="loading">
+            <Loader2 class="animate-spin" :size="18" aria-hidden="true" /> 发送中...
+          </template>
+          <template v-else>
+            发送重置邮件
+          </template>
         </button>
         
         <div class="auth-footer">
@@ -136,6 +144,10 @@ const handleResetPassword = async () => {
   color: var(--color-danger);
   font-size: 0.875rem;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-xs;
 }
 
 .success-message {
@@ -145,12 +157,29 @@ const handleResetPassword = async () => {
   padding: $spacing-lg;
   border-radius: $radius-md;
   border: 1px solid #a7f3d0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-md;
+
+  .msg-content {
+    text-align: left;
+  }
   
   .tip {
-    margin-top: $spacing-sm;
+    margin-top: $spacing-xs;
     font-size: 0.875rem;
     color: var(--color-text-muted);
   }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .auth-footer {

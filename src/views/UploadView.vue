@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../supabase/client'
 import { useUserStore } from '../stores/user'
-import { Upload, X } from 'lucide-vue-next'
+import { Upload, X, FileCode, ImageIcon, Tag as TagIcon, Check, Loader2, ArrowLeft, ShieldAlert } from 'lucide-vue-next'
 import { useHead } from '@vueuse/head'
 
 const router = useRouter()
@@ -115,116 +115,136 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="container">
-    <div class="upload-header">
-      <h1>上传新模型</h1>
-      <p class="subtitle">与社区分享你的 YSM 创作</p>
-    </div>
+  <div class="container py-xl">
+    <div class="upload-wrapper">
+      <header class="upload-header">
+        <button @click="router.back()" class="back-btn" aria-label="返回上一页">
+          <ArrowLeft :size="20" aria-hidden="true" />
+        </button>
+        <div class="header-text">
+          <h1>发布新模型</h1>
+          <p>分享您的 Minecraft 创意作品，让更多人发现</p>
+        </div>
+      </header>
 
-    <div class="card upload-form">
-      <form @submit.prevent="handleSubmit">
-        <!-- File Upload Section -->
-        <div class="form-section">
-          <h2>模型文件</h2>
-          
-          <div class="form-group">
-            <label>模型文件 (.ysm, .zip)</label>
-            <div class="file-input-wrapper">
-              <input 
-                type="file" 
-                accept=".ysm,.zip,.rar,.7z" 
-                @change="handleModelSelect" 
-                class="file-input"
-                required
-              >
-              <div class="file-placeholder" :class="{ 'has-file': modelFile }">
-                <Upload :size="24" />
-                <span>{{ modelFile ? modelFile.name : '点击选择或拖拽文件到此处' }}</span>
+      <form @submit.prevent="handleSubmit" class="upload-form">
+        <div class="form-grid">
+          <!-- Left Column: Main Info -->
+          <div class="form-main">
+            <div class="form-card">
+              <div class="form-group">
+                <label for="title">模型标题 <span class="required" aria-hidden="true">*</span></label>
+                <input 
+                  id="title" 
+                  v-model="title" 
+                  type="text" 
+                  class="input input--lg" 
+                  required 
+                  placeholder="给您的模型起一个响亮的名字"
+                  aria-required="true"
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="description">描述详情</label>
+                <textarea 
+                  id="description" 
+                  v-model="description" 
+                  class="input textarea" 
+                  rows="10"
+                  placeholder="详细介绍您的模型特点、使用方法等 (支持 Markdown)"
+                ></textarea>
+              </div>
+            </div>
+
+            <div class="form-card">
+              <h3 class="card-title"><TagIcon :size="18" aria-hidden="true" /> 标签分类</h3>
+              <div class="tag-input-wrapper">
+                <input 
+                  v-model="tagInput" 
+                  type="text" 
+                  class="input" 
+                  placeholder="按回车添加标签"
+                  @keydown.enter.prevent="addTag"
+                  aria-label="输入标签并按回车添加"
+                >
+                <button type="button" @click="addTag" class="btn btn--secondary btn--sm">添加</button>
+              </div>
+              <div class="tags-display" role="list" aria-label="已添加的标签">
+                <span v-for="tag in tags" :key="tag" class="tag-chip" role="listitem">
+                  {{ tag }}
+                  <button type="button" @click="removeTag(tag)" class="remove-tag" :aria-label="`删除标签 ${tag}`"><X :size="12" aria-hidden="true" /></button>
+                </span>
+                <p v-if="tags.length === 0" class="empty-tags">暂无标签</p>
               </div>
             </div>
           </div>
 
-          <div class="form-group">
-            <label>预览图片</label>
-            <div class="file-input-wrapper">
-              <input 
-                type="file" 
-                accept="image/*" 
-                @change="handleImageSelect" 
-                class="file-input"
-              >
-              <div class="file-placeholder" :class="{ 'has-file': imageFile }">
-                <img v-if="imagePreview" :src="imagePreview" class="image-preview" />
-                <div v-else class="placeholder-content">
-                  <Upload :size="24" />
-                  <span>选择预览图片</span>
-                </div>
+          <!-- Right Column: Files & Settings -->
+          <aside class="form-side">
+            <div class="form-card file-card">
+              <h3 class="card-title"><FileCode :size="18" aria-hidden="true" /> 模型文件 <span class="required" aria-hidden="true">*</span></h3>
+              <div class="file-upload-zone" :class="{ 'has-file': modelFile }">
+                <input 
+                  type="file" 
+                  id="modelFile" 
+                  class="file-input" 
+                  @change="handleModelSelect"
+                  accept=".ysm,.zip"
+                  required
+                  aria-required="true"
+                >
+                <label for="modelFile" class="file-label">
+                  <template v-if="!modelFile">
+                    <Upload :size="32" aria-hidden="true" />
+                    <span>选择或拖拽模型文件</span>
+                    <small>支持 .ysm, .zip 格式</small>
+                  </template>
+                  <template v-else>
+                    <Check :size="32" class="success-icon" aria-hidden="true" />
+                    <span class="file-name">{{ modelFile.name }}</span>
+                    <button type="button" @click.stop.prevent="modelFile = null" class="btn btn--sm btn--secondary">更改文件</button>
+                  </template>
+                </label>
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Details Section -->
-        <div class="form-section">
-          <h2>模型详情</h2>
-          
-          <div class="form-group">
-            <label for="title">标题</label>
-            <input 
-              id="title" 
-              v-model="title" 
-              type="text" 
-              class="input" 
-              required 
-              placeholder="例如：酷炫的 Steve 变体"
-            >
-          </div>
-
-          <div class="form-group">
-            <label for="description">描述 (支持 Markdown)</label>
-            <textarea 
-              id="description" 
-              v-model="description" 
-              class="input textarea" 
-              rows="8"
-              placeholder="描述你的模型... 支持 Markdown 语法"
-            ></textarea>
-          </div>
-
-          <div class="form-group">
-            <label>标签</label>
-            <div class="tags-input">
-              <div v-for="tag in tags" :key="tag" class="tag">
-                {{ tag }}
-                <button type="button" @click="removeTag(tag)"><X :size="14" /></button>
+            <div class="form-card image-card">
+              <h3 class="card-title"><ImageIcon :size="18" aria-hidden="true" /> 预览图片</h3>
+              <div class="image-upload-zone" :class="{ 'has-preview': imagePreview }">
+                <input 
+                  type="file" 
+                  id="imageFile" 
+                  class="file-input" 
+                  @change="handleImageSelect"
+                  accept="image/*"
+                >
+                <label for="imageFile" class="image-label">
+                  <img v-if="imagePreview" :src="imagePreview" :alt="title ? `${title} 的预览图` : '模型预览图'">
+                  <template v-else>
+                    <Upload :size="24" aria-hidden="true" />
+                    <span>上传封面图</span>
+                  </template>
+                </label>
+                <button v-if="imagePreview" type="button" @click.stop.prevent="imagePreview = null; imageFile = null" class="remove-image" aria-label="移除图片">
+                  <X :size="16" aria-hidden="true" />
+                </button>
               </div>
-              <input 
-                v-model="tagInput" 
-                @keydown.enter.prevent="addTag" 
-                type="text" 
-                class="input-ghost" 
-                placeholder="添加标签 (按回车)"
-              >
             </div>
-          </div>
 
-          <div class="form-group checkbox-group">
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="isPublic">
-              <span>公开此模型</span>
-            </label>
-          </div>
-        </div>
+            <div v-if="errorMsg" class="error-msg" role="alert" aria-live="assertive">
+              <ShieldAlert :size="18" aria-hidden="true" /> {{ errorMsg }}
+            </div>
 
-        <div v-if="errorMsg" class="error-message">
-          {{ errorMsg }}
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" @click="router.back()">取消</button>
-          <button type="submit" class="btn btn--primary" :disabled="loading">
-            {{ loading ? '上传中...' : '发布模型' }}
-          </button>
+            <button type="submit" class="btn btn--primary submit-btn" :disabled="loading" :aria-busy="loading">
+              <template v-if="loading">
+                <Loader2 class="animate-spin" :size="20" aria-hidden="true" /> 正在发布...
+              </template>
+              <template v-else>
+                发布模型
+              </template>
+            </button>
+          </aside>
         </div>
       </form>
     </div>
@@ -234,180 +254,312 @@ const handleSubmit = async () => {
 <style lang="scss" scoped>
 @use '../styles/themes/variables' as *;
 
+.upload-wrapper {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
 .upload-header {
-  margin-bottom: $spacing-xl;
-  
-  h1 {
-    font-size: 2rem;
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-lg;
+  margin-bottom: $spacing-2xl;
+
+  .back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: $radius-full;
+    border: 1px solid var(--color-border);
+    background: white;
+    color: var(--color-text-main);
+    cursor: pointer;
+    transition: $transition-base;
+    margin-top: 4px;
+
+    &:hover {
+      background: var(--color-bg-alt);
+      border-color: var(--color-text-muted);
+      transform: translateX(-4px);
+    }
+  }
+
+  .header-text {
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--color-text-main);
+      margin-bottom: $spacing-xs;
+      letter-spacing: -0.025em;
+    }
+
+    p {
+      color: var(--color-text-muted);
+      font-size: 1.125rem;
+    }
+  }
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: $spacing-xl;
+  align-items: flex-start;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-main, .form-side {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xl;
+}
+
+.form-card {
+  background: white;
+  border-radius: $radius-xl;
+  border: 1px solid var(--color-border);
+  padding: $spacing-xl;
+  box-shadow: $shadow-sm;
+
+  .card-title {
+    font-size: 1.125rem;
     font-weight: 700;
     color: var(--color-text-main);
-  }
-
-  .subtitle {
-    color: var(--color-text-muted);
-  }
-}
-
-.upload-form {
-  padding: $spacing-xl;
-}
-
-.form-section {
-  margin-bottom: $spacing-xl;
-  padding-bottom: $spacing-xl;
-  border-bottom: 1px solid var(--color-border);
-
-  &:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-    margin-bottom: 0;
-  }
-
-  h2 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin-bottom: $spacing-md;
-    color: var(--color-text-main);
+    margin-bottom: $spacing-lg;
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
   }
 }
 
 .form-group {
-  margin-bottom: $spacing-md;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-lg;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 
   label {
-    display: block;
-    font-weight: 500;
-    margin-bottom: $spacing-sm;
+    font-size: 0.9375rem;
+    font-weight: 600;
     color: var(--color-text-main);
+
+    .required {
+      color: #ef4444;
+      margin-left: 2px;
+    }
+  }
+
+  .input--lg {
+    font-size: 1.125rem;
+    font-weight: 500;
+  }
+
+  .textarea {
+    resize: vertical;
+    line-height: 1.6;
   }
 }
 
-.file-input-wrapper {
-  position: relative;
-  height: 120px;
-  border: 2px dashed var(--color-border);
-  border-radius: $radius-md;
-  overflow: hidden;
-  transition: $transition-base;
-
-  &:hover {
-    border-color: var(--color-primary);
-    background-color: #f9fafb;
-  }
-}
-
-.file-input {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 10;
-}
-
-.file-placeholder {
+.tag-input-wrapper {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--color-text-muted);
   gap: $spacing-sm;
-
-  &.has-file {
-    color: var(--color-primary);
-    border-color: var(--color-primary);
-  }
+  margin-bottom: $spacing-md;
 }
 
-.image-preview {
-  height: 100%;
-  width: 100%;
-  object-fit: cover;
-}
-
-.placeholder-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: $spacing-sm;
-}
-
-.textarea {
-  resize: vertical;
-}
-
-.tags-input {
+.tags-display {
   display: flex;
   flex-wrap: wrap;
   gap: $spacing-sm;
-  padding: $spacing-sm;
-  border: 1px solid var(--color-border);
-  border-radius: $radius-md;
-  background-color: white;
 
-  &:focus-within {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba($color-primary, 0.2);
-  }
-}
-
-.tag {
-  display: flex;
-  align-items: center;
-  gap: $spacing-xs;
-  background-color: #e0e7ff;
-  color: var(--color-primary);
-  padding: 2px 8px;
-  border-radius: $radius-full;
-  font-size: 0.875rem;
-
-  button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: inherit;
+  .tag-chip {
     display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    padding: $spacing-xs $spacing-sm;
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: $radius-full;
+    font-size: 0.875rem;
+    color: var(--color-text-main);
+
+    .remove-tag {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      background: none;
+      border: none;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      border-radius: $radius-full;
+
+      &:hover {
+        color: #ef4444;
+        background: rgba(#ef4444, 0.1);
+      }
+    }
+  }
+
+  .empty-tags {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    font-style: italic;
   }
 }
 
-.input-ghost {
-  border: none;
-  outline: none;
-  flex: 1;
-  min-width: 120px;
+.file-upload-zone {
+  position: relative;
+  border: 2px dashed var(--color-border);
+  border-radius: $radius-lg;
+  transition: $transition-base;
+  
+  &:hover {
+    border-color: var(--color-primary);
+    background: rgba($color-primary, 0.02);
+  }
+
+  &.has-file {
+    border-style: solid;
+    border-color: #10b981;
+    background: rgba(#10b981, 0.02);
+  }
+
+  .file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 1;
+  }
+
+  .file-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-2xl $spacing-md;
+    text-align: center;
+    gap: $spacing-sm;
+    color: var(--color-text-muted);
+
+    span {
+      font-weight: 600;
+      color: var(--color-text-main);
+    }
+
+    small {
+      font-size: 0.75rem;
+    }
+
+    .success-icon {
+      color: #10b981;
+    }
+
+    .file-name {
+      font-size: 0.875rem;
+      word-break: break-all;
+    }
+
+    .btn {
+      position: relative;
+      z-index: 2;
+    }
+  }
+}
+
+.image-upload-zone {
+  position: relative;
+  border-radius: $radius-lg;
+  overflow: hidden;
+  background: var(--color-bg-alt);
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--color-border);
+
+  .file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 1;
+  }
+
+  .image-label {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-xs;
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .remove-image {
+    position: absolute;
+    top: $spacing-sm;
+    right: $spacing-sm;
+    width: 32px;    height: 32px;
+    border-radius: $radius-full;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+    backdrop-filter: blur(4px);
+    transition: $transition-base;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.8);
+      transform: scale(1.1);
+    }
+  }
+}
+
+.error-msg {
+  background-color: #fef2f2;
+  border: 1px solid #fee2e2;
+  color: #ef4444;
+  padding: $spacing-md;
+  border-radius: $radius-lg;
   font-size: 0.875rem;
-}
-
-.checkbox-group {
-  margin-top: $spacing-md;
-}
-
-.checkbox-label {
   display: flex;
   align-items: center;
   gap: $spacing-sm;
-  cursor: pointer;
-  user-select: none;
-
-  input {
-    width: 1.25rem;
-    height: 1.25rem;
-  }
 }
 
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: $spacing-md;
-  margin-top: $spacing-xl;
+.submit-btn {
+  width: 100%;
+  height: 3.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  gap: $spacing-sm;
 }
 
-.error-message {
-  color: var(--color-danger);
-  margin-top: $spacing-md;
-  text-align: center;
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

@@ -1,32 +1,38 @@
 // Colors
-$color-primary: #4f46e5; // Indigo 600
-$color-primary-hover: #4338ca; // Indigo 700
+$color-primary: #6366f1; // Indigo 500 (more vibrant)
+$color-primary-hover: #4f46e5; // Indigo 600
 $color-secondary: #10b981; // Emerald 500
 $color-danger: #ef4444; // Red 500
-$color-background: #f9fafb; // Gray 50
+$color-background: #f8fafc; // Slate 50
 $color-surface: #ffffff;
-$color-text-main: #111827; // Gray 900
-$color-text-muted: #6b7280; // Gray 500
-$color-border: #e5e7eb; // Gray 200
+$color-text-main: #0f172a; // Slate 900
+$color-text-muted: #64748b; // Slate 500
+$color-border: #e2e8f0; // Slate 200
 
 // Spacing
+$spacing-2xs: 0.125rem;
 $spacing-xs: 0.25rem;
 $spacing-sm: 0.5rem;
 $spacing-md: 1rem;
 $spacing-lg: 1.5rem;
 $spacing-xl: 2rem;
 $spacing-2xl: 3rem;
+$spacing-3xl: 4rem;
 
 // Border Radius
 $radius-sm: 0.25rem;
-$radius-md: 0.375rem;
-$radius-lg: 0.5rem;
+$radius-md: 0.5rem; // Increased
+$radius-lg: 0.75rem; // Increased
+$radius-xl: 1rem; // New
+$radius-2xl: 1.5rem; // New
 $radius-full: 9999px;
 
 // Shadows
-$shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+$shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 $shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 $shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+$shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 
 // Transitions
-$transition-base: all 0.2s ease-in-out;
+$transition-base: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+$transition-slow: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

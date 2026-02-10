@@ -5,6 +5,8 @@ import { supabase } from '../supabase/client'
 import { User as UserIcon, Package, Heart } from 'lucide-vue-next'
 import { useHead } from '@vueuse/head'
 import type { Model, Profile } from '../types'
+import LoadingSpinner from '../components/LoadingSpinner.vue'
+import ModelCard from '../components/ModelCard.vue'
 
 const route = useRoute()
 const profile = ref<Profile | null>(null)
@@ -71,110 +73,121 @@ onMounted(() => {
 
 <template>
   <div class="container">
-    <div v-if="loading" class="loading">
-      正在加载用户资料...
+    <div v-if="loading" class="loading-container" role="status" aria-live="polite">
+      <LoadingSpinner />
+      <p>正在加载用户资料...</p>
     </div>
 
-    <div v-else-if="!profile" class="empty-state">
+    <div v-else-if="!profile" class="empty-state" role="alert" aria-live="assertive">
       <p>未找到该用户</p>
     </div>
 
-    <div v-else class="profile-page">
+    <div v-else class="profile-page" role="main" :aria-label="`${profile.username} 的个人资料`" aria-live="polite">
       <!-- Header -->
-      <div class="profile-header">
+      <header class="profile-header" aria-labelledby="profile-name">
         <div class="avatar-wrapper">
-          <img v-if="profile.avatar_url" :src="profile.avatar_url" class="avatar-img">
-          <div v-else class="avatar-placeholder">
-            <UserIcon :size="64" />
+          <img 
+            v-if="profile.avatar_url" 
+            :src="profile.avatar_url" 
+            :alt="`${profile.username} 的头像`"
+            class="avatar-img"
+            loading="lazy"
+          >
+          <div v-else class="avatar-placeholder" role="img" :aria-label="`${profile.username} 的默认头像`">
+            <UserIcon :size="64" aria-hidden="true" />
           </div>
         </div>
         <div class="info">
-          <h1>{{ profile.username }}</h1>
+          <h1 id="profile-name">{{ profile.username }}</h1>
           <p class="bio">{{ profile.bio || '这位用户很懒，什么都没写。' }}</p>
-          <p class="join-date">加入于 {{ new Date(profile.created_at).toLocaleDateString() }}</p>
+          <p class="join-date" :aria-label="`加入日期: ${new Date(profile.created_at).toLocaleDateString()}`">
+            加入于 {{ new Date(profile.created_at).toLocaleDateString() }}
+          </p>
         </div>
-      </div>
+      </header>
 
       <!-- Tabs -->
-      <div class="tabs">
+      <nav class="tabs" role="tablist" aria-label="用户模型选项卡">
         <button 
+          role="tab"
+          :aria-selected="activeTab === 'uploads'"
+          aria-controls="uploads-panel"
+          id="tab-uploads"
           @click="activeTab = 'uploads'" 
           :class="['tab-btn', activeTab === 'uploads' ? 'active' : '']"
         >
-          <Package :size="18" /> 上传的模型 ({{ uploadedModels.length }})
+          <Package :size="18" aria-hidden="true" /> 上传的模型 ({{ uploadedModels.length }})
         </button>
         <button 
+          role="tab"
+          :aria-selected="activeTab === 'favorites'"
+          aria-controls="favorites-panel"
+          id="tab-favorites"
           @click="activeTab = 'favorites'" 
           :class="['tab-btn', activeTab === 'favorites' ? 'active' : '']"
         >
-          <Heart :size="18" /> 收藏的模型 ({{ favoritedModels.length }})
+          <Heart :size="18" aria-hidden="true" /> 收藏的模型 ({{ favoritedModels.length }})
         </button>
-      </div>
+      </nav>
 
       <!-- Content -->
-      <div class="content-area">
-        <div v-if="activeTab === 'uploads'">
+      <main class="content-area">
+        <div 
+          v-if="activeTab === 'uploads'" 
+          id="uploads-panel" 
+          role="tabpanel" 
+          aria-labelledby="tab-uploads"
+        >
           <div v-if="uploadedModels.length === 0" class="empty-tab">
-            <Package :size="48" />
+            <Package :size="48" aria-hidden="true" />
             <p>该用户还没有上传任何模型</p>
           </div>
           <div v-else class="model-grid">
-            <div 
-              v-for="model in uploadedModels" 
+            <ModelCard 
+              v-for="(model, index) in uploadedModels" 
               :key="model.id" 
-              class="model-card"
-            >
-              <RouterLink :to="`/model/${model.id}`" class="model-image-link">
-                <div class="model-image">
-                  <img :src="model.image_url || 'https://via.placeholder.com/400x300?text=暂无预览'" :alt="model.title">
-                </div>
-              </RouterLink>
-              <div class="model-info">
-                <RouterLink :to="`/model/${model.id}`" class="model-title-link">
-                  <h3 class="model-title">{{ model.title }}</h3>
-                </RouterLink>
-                <div class="model-meta">
-                  <span>{{ new Date(model.created_at).toLocaleDateString() }}</span>
-                  <span>•</span>
-                  <span>{{ model.downloads }} 下载</span>
-                </div>
-              </div>
-            </div>
+              :model="model"
+              :index="index"
+            />
           </div>
         </div>
 
-        <div v-if="activeTab === 'favorites'">
+        <div 
+          v-if="activeTab === 'favorites'" 
+          id="favorites-panel" 
+          role="tabpanel" 
+          aria-labelledby="tab-favorites"
+        >
           <div v-if="favoritedModels.length === 0" class="empty-tab">
-            <Heart :size="48" />
+            <Heart :size="48" aria-hidden="true" />
             <p>该用户还没有收藏任何模型</p>
           </div>
           <div v-else class="model-grid">
-            <div 
-              v-for="model in favoritedModels" 
+            <ModelCard 
+              v-for="(model, index) in favoritedModels" 
               :key="model.id" 
-              class="model-card"
-            >
-              <RouterLink :to="`/model/${model.id}`" class="model-image-link">
-                <div class="model-image">
-                  <img :src="model.image_url || 'https://via.placeholder.com/400x300?text=暂无预览'" :alt="model.title">
-                </div>
-              </RouterLink>
-              <div class="model-info">
-                <RouterLink :to="`/model/${model.id}`" class="model-title-link">
-                  <h3 class="model-title">{{ model.title }}</h3>
-                </RouterLink>
-                <RouterLink :to="`/user/${model.user_id}`" class="model-author">作者: {{ model.profiles?.username || '未知' }}</RouterLink>
-              </div>
-            </div>
+              :model="model"
+              :index="index"
+            />
           </div>
         </div>
-      </div>
+      </main>
     </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
 @use '../styles/themes/variables' as *;
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-2xl;
+  gap: $spacing-md;
+  color: var(--color-text-muted);
+}
 
 .profile-header {
   display: flex;
@@ -272,82 +285,8 @@ onMounted(() => {
 
 .model-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: $spacing-lg;
-}
-
-.model-card {
-  background-color: white;
-  border: 1px solid var(--color-border);
-  border-radius: $radius-lg;
-  overflow: hidden;
-  transition: $transition-base;
-  display: flex;
-  flex-direction: column;
-
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: $shadow-lg;
-    border-color: var(--color-primary);
-  }
-}
-
-.model-image {
-  aspect-ratio: 4/3;
-  background-color: #f3f4f6;
-  overflow: hidden;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-}
-
-.model-image-link {
-  display: block;
-}
-
-.model-info {
-  padding: $spacing-md;
-}
-
-.model-title-link {
-  text-decoration: none;
-  display: block;
-  color: inherit;
-  
-  &:hover .model-title {
-    color: var(--color-primary);
-  }
-}
-
-.model-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text-main);
-  margin-bottom: $spacing-xs;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: color 0.2s;
-}
-
-.model-meta {
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-}
-
-.model-author {
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  display: inline-block;
-  text-decoration: none;
-  transition: color 0.2s;
-  
-  &:hover {
-    color: var(--color-primary);
-  }
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: $spacing-xl;
 }
 
 .empty-tab {
@@ -358,11 +297,5 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: $spacing-md;
-}
-
-.loading {
-  text-align: center;
-  padding: $spacing-2xl;
-  color: var(--color-text-muted);
 }
 </style>

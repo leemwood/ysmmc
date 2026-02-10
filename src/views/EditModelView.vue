@@ -213,19 +213,18 @@ onMounted(() => {
 <template>
   <div class="container">
     <div class="edit-header">
-      <button class="btn btn--ghost" @click="router.back()">
-        <ArrowLeft :size="20" /> 返回
+      <button class="btn btn--ghost" @click="router.back()" aria-label="返回上一页">
+        <ArrowLeft :size="20" aria-hidden="true" /> 返回
       </button>
       <h1>编辑模型</h1>
     </div>
 
-    <div v-if="loading" class="loading">
-      正在加载...
-    </div>
+    <LoadingSpinner v-if="loading" message="正在加载模型数据..." />
 
     <div v-else-if="model" class="card edit-form">
       <form @submit.prevent="handleSubmit">
-        <div v-if="model.update_status === 'pending_review'" class="alert alert-warning">
+        <div v-if="model.update_status === 'pending_review'" class="alert alert-warning" role="alert">
+          <ShieldAlert :size="20" aria-hidden="true" />
           此模型已有正在审核中的更新请求。提交新请求将覆盖之前的申请。
         </div>
 
@@ -233,34 +232,36 @@ onMounted(() => {
           <h2>模型文件与预览</h2>
           
           <div class="form-group">
-            <label>更新模型文件 (可选)</label>
+            <label for="modelFile">更新模型文件 (可选)</label>
             <div class="file-input-wrapper">
               <input 
+                id="modelFile"
                 type="file" 
                 accept=".ysm,.zip,.rar,.7z" 
                 @change="handleModelSelect" 
                 class="file-input"
               >
               <div class="file-placeholder" :class="{ 'has-file': modelFile }">
-                <Upload :size="24" />
+                <Upload :size="24" aria-hidden="true" />
                 <span>{{ modelFile ? modelFile.name : '点击上传新版本 (保持不变则留空)' }}</span>
               </div>
             </div>
           </div>
 
           <div class="form-group">
-            <label>更新预览图片 (可选)</label>
+            <label for="imageFile">更新预览图片 (可选)</label>
             <div class="file-input-wrapper">
               <input 
+                id="imageFile"
                 type="file" 
                 accept="image/*" 
                 @change="handleImageSelect" 
                 class="file-input"
               >
               <div class="file-placeholder" :class="{ 'has-file': imageFile }">
-                <img v-if="currentImage" :src="currentImage" class="image-preview" />
+                <img v-if="currentImage" :src="currentImage" class="image-preview" :alt="`${title} 的当前预览图`" />
                 <div v-else class="placeholder-content">
-                  <Upload :size="24" />
+                  <Upload :size="24" aria-hidden="true" />
                   <span>点击上传新图片</span>
                 </div>
               </div>
@@ -294,10 +295,10 @@ onMounted(() => {
 
           <div class="form-group">
             <label>标签</label>
-            <div class="tags-input">
-              <div v-for="tag in tags" :key="tag" class="tag">
+            <div class="tags-input" role="list" aria-label="已添加的标签">
+              <div v-for="tag in tags" :key="tag" class="tag" role="listitem">
                 {{ tag }}
-                <button type="button" @click="removeTag(tag)"><X :size="14" /></button>
+                <button type="button" @click="removeTag(tag)" :aria-label="`删除标签 ${tag}`"><X :size="14" aria-hidden="true" /></button>
               </div>
               <input 
                 v-model="tagInput" 
@@ -305,6 +306,7 @@ onMounted(() => {
                 type="text" 
                 class="input-ghost" 
                 placeholder="添加标签 (按回车)"
+                aria-label="输入标签并按回车添加"
               >
             </div>
           </div>
@@ -317,17 +319,17 @@ onMounted(() => {
           </div>
         </div>
 
-        <div v-if="errorMsg" class="error-message">
+        <div v-if="errorMsg" class="error-message" role="alert" aria-live="assertive">
           {{ errorMsg }}
         </div>
         
-        <div v-if="successMsg" class="success-message">
+        <div v-if="successMsg" class="success-message" role="status" aria-live="polite">
           {{ successMsg }}
         </div>
 
         <div class="form-actions">
           <button type="button" class="btn btn--secondary" @click="router.back()">取消</button>
-          <button type="submit" class="btn btn--primary" :disabled="saving">
+          <button type="submit" class="btn btn--primary" :disabled="saving" :aria-busy="saving">
             {{ saving ? '提交中...' : '提交更新申请' }}
           </button>
         </div>
@@ -524,12 +526,20 @@ onMounted(() => {
   color: var(--color-danger);
   margin-top: $spacing-md;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-xs;
 }
 
 .success-message {
   color: var(--color-secondary);
   margin-top: $spacing-md;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-xs;
 }
 
 .alert {
@@ -542,6 +552,9 @@ onMounted(() => {
   background-color: #fff7ed;
   color: #c2410c;
   border: 1px solid #ffedd5;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
 }
 
 .loading {

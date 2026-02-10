@@ -76,6 +76,7 @@ const handleUpdatePassword = async () => {
             required 
             minlength="6"
             placeholder="请输入新密码"
+            aria-required="true"
           >
         </div>
 
@@ -89,19 +90,25 @@ const handleUpdatePassword = async () => {
             required 
             minlength="6"
             placeholder="请再次输入新密码"
+            aria-required="true"
           >
         </div>
 
-        <div v-if="errorMsg" class="error-message">
-          {{ errorMsg }}
+        <div v-if="errorMsg" class="error-message" role="alert" aria-live="polite">
+          <ShieldAlert :size="18" aria-hidden="true" /> {{ errorMsg }}
         </div>
 
-        <div v-if="successMsg" class="success-message">
-          {{ successMsg }}
+        <div v-if="successMsg" class="success-message" role="status" aria-live="polite">
+          <CheckCircle :size="18" aria-hidden="true" /> {{ successMsg }}
         </div>
 
-        <button type="submit" class="btn btn--primary" :disabled="loading">
-          {{ loading ? '提交中...' : '确认修改' }}
+        <button type="submit" class="btn btn--primary" :disabled="loading" :aria-busy="loading">
+          <template v-if="loading">
+            <Loader2 class="animate-spin" :size="18" aria-hidden="true" /> 提交中...
+          </template>
+          <template v-else>
+            确认修改
+          </template>
         </button>
       </form>
     </div>
@@ -154,11 +161,28 @@ const handleUpdatePassword = async () => {
   color: var(--color-danger);
   font-size: 0.875rem;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-xs;
 }
 
 .success-message {
   color: var(--color-success);
   font-size: 0.875rem;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-xs;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

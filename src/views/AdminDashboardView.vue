@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LoadingSpinner from '../components/LoadingSpinner.vue'
 import { ref, onMounted, computed } from 'vue'
 import { supabase } from '../supabase/client'
 import { Check, X, User, Box, Search, Trash2, Shield, ShieldAlert, Edit, Users, FolderTree } from 'lucide-vue-next'
@@ -255,277 +256,309 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="container">
-    <div class="admin-header">
-      <h1>管理员控制台</h1>
-      <p>审核用户上传的模型和资料更新</p>
-    </div>
-
-    <div class="tabs">
-      <button 
-        @click="switchTab('audit_models')" 
-        :class="['tab-btn', activeTab === 'audit_models' ? 'active' : '']"
-      >
-        <FolderTree :size="18" /> 模型审核
-        <span v-if="pendingModels.length" class="badge">{{ pendingModels.length }}</span>
-      </button>
-      <button 
-        @click="switchTab('audit_profiles')" 
-        :class="['tab-btn', activeTab === 'audit_profiles' ? 'active' : '']"
-      >
-        <User :size="18" /> 资料审核
-        <span v-if="pendingProfiles.length" class="badge">{{ pendingProfiles.length }}</span>
-      </button>
-      <button 
-        @click="switchTab('manage_models')" 
-        :class="['tab-btn', activeTab === 'manage_models' ? 'active' : '']"
-      >
-        <Box :size="18" /> 模型管理
-      </button>
-      <button 
-        @click="switchTab('manage_users')" 
-        :class="['tab-btn', activeTab === 'manage_users' ? 'active' : '']"
-      >
-        <Users :size="18" /> 用户管理
-      </button>
-    </div>
-
-    <div v-if="loading" class="loading">
-      正在加载...
-    </div>
-
-    <!-- Models Audit List -->
-    <div v-else-if="activeTab === 'audit_models'">
-      <div v-if="pendingModels.length === 0" class="empty-state">
-        <div class="empty-icon">
-          <Check :size="48" />
-        </div>
-        <p>太棒了！所有模型都已审核完毕。</p>
+  <div class="container py-xl">
+    <header class="admin-header">
+      <div class="header-content">
+        <h1>管理员控制台</h1>
+        <p>审核用户申请、管理模型库及维护社区秩序</p>
       </div>
+      <div class="header-stats" v-if="!loading">
+        <div class="stat-item" v-if="pendingModels.length > 0">
+          <span class="stat-value">{{ pendingModels.length }}</span>
+          <span class="stat-label">待审模型</span>
+        </div>
+        <div class="stat-item" v-if="pendingProfiles.length > 0">
+          <span class="stat-value">{{ pendingProfiles.length }}</span>
+          <span class="stat-label">待审资料</span>
+        </div>
+      </div>
+    </header>
 
-      <div v-else class="audit-list">
-        <div v-for="model in pendingModels" :key="model.id" class="audit-item">
-          <div class="item-preview">
-             <img :src="model.image_url || 'https://via.placeholder.com/150x100?text=暂无预览'" :alt="model.title">
-          </div>
-          
-          <div class="item-info">
-            <h3>
-              {{ model.title }} 
-              <span class="arrow" v-if="model.update_status === 'pending_review' && model.pending_changes?.title">→ {{ model.pending_changes.title }}</span>
-              <span v-if="model.update_status === 'pending_review'" class="badge update-badge">更新申请</span>
-              <span v-else class="badge new-badge">新上传</span>
-            </h3>
-            
-            <template v-if="model.update_status === 'pending_review' && model.pending_changes">
-               <div v-if="model.pending_changes.description" class="change-block">
-                 <p class="label">描述变更</p>
-                 <p class="new-val">{{ model.pending_changes.description }}</p>
-               </div>
-               <div v-if="model.pending_changes.file_path" class="change-block">
-                 <p class="new-val">申请更新模型文件</p>
-               </div>
-               <div v-if="model.pending_changes.image_url" class="change-block">
-                 <p class="new-val">申请更新预览图</p>
-               </div>
-            </template>
+    <nav class="tabs-nav" role="tablist" aria-label="管理选项卡">
+      <div class="tabs-list">
+        <button 
+          v-for="tab in [
+            { id: 'audit_models', label: '模型审核', icon: FolderTree, count: pendingModels.length },
+            { id: 'audit_profiles', label: '资料审核', icon: User, count: pendingProfiles.length },
+            { id: 'manage_models', label: '模型管理', icon: Box },
+            { id: 'manage_users', label: '用户管理', icon: Users }
+          ]"
+          :key="tab.id"
+          role="tab"
+          :aria-selected="activeTab === tab.id"
+          :aria-controls="`${tab.id}-panel`"
+          :id="`tab-${tab.id}`"
+          @click="switchTab(tab.id as any)" 
+          :class="['tab-btn', activeTab === tab.id ? 'active' : '']"
+        >
+          <component :is="tab.icon" :size="18" aria-hidden="true" />
+          <span>{{ tab.label }}</span>
+          <span v-if="tab.count" class="tab-badge" aria-label="待处理数量">{{ tab.count }}</span>
+        </button>
+      </div>
+    </nav>
 
-            <p class="item-meta">
-              <span>上传者: {{ model.profiles?.username || '未知' }}</span>
-              <span>•</span>
-              <span>{{ new Date(model.created_at).toLocaleDateString() }}</span>
-            </p>
-            <p class="item-desc">{{ model.description || '无描述' }}</p>
-            <div class="item-tags">
-              <span v-for="tag in model.tags" :key="tag" class="tag">{{ tag }}</span>
+    <main class="admin-content" aria-live="polite">
+      <LoadingSpinner v-if="loading" message="正在获取数据..." :aria-busy="true" />
+
+      <Transition name="fade" mode="out-in">
+        <div :key="activeTab" v-if="!loading" :id="`${activeTab}-panel`" role="tabpanel" :aria-labelledby="`tab-${activeTab}`">
+          <!-- Models Audit List -->
+          <div v-if="activeTab === 'audit_models'">
+            <div v-if="pendingModels.length === 0" class="empty-state" role="alert" aria-live="polite">
+              <div class="empty-illustration" aria-hidden="true">
+                <Check :size="48" />
+              </div>
+              <h3>暂无待审核模型</h3>
+              <p>所有上传均已处理完毕，休息一下吧！</p>
+            </div>
+
+            <div v-else class="audit-grid">
+              <article v-for="model in pendingModels" :key="model.id" class="audit-card">
+                <div class="card-preview">
+                   <img :src="model.image_url || 'https://via.placeholder.com/300x200?text=No+Preview'" :alt="`${model.title} 的预览图`" loading="lazy">
+                   <div class="card-type-tag" :class="model.update_status === 'pending_review' ? 'type-update' : 'type-new'">
+                     {{ model.update_status === 'pending_review' ? '更新申请' : '新模型' }}
+                   </div>
+                </div>
+                
+                <div class="card-body">
+                  <header class="card-header">
+                    <h3 class="card-title">
+                      {{ model.title }}
+                      <template v-if="model.update_status === 'pending_review' && model.pending_changes?.title">
+                        <ArrowRight :size="16" class="title-arrow" aria-hidden="true" />
+                        <span class="new-title">{{ model.pending_changes.title }}</span>
+                      </template>
+                    </h3>
+                    <div class="card-meta">
+                      <span class="author">
+                        <User :size="14" aria-hidden="true" /> {{ model.profiles?.username || '未知用户' }}
+                      </span>
+                      <span class="dot" aria-hidden="true">•</span>
+                      <span class="date">{{ new Date(model.created_at).toLocaleDateString() }}</span>
+                    </div>
+                  </header>
+
+                  <div class="card-changes" v-if="model.update_status === 'pending_review' && model.pending_changes">
+                     <div v-if="model.pending_changes.description" class="change-item">
+                       <span class="change-label">描述更新</span>
+                       <p class="change-content">{{ model.pending_changes.description }}</p>
+                     </div>
+                     <div v-if="model.pending_changes.file_path" class="change-item">
+                       <span class="change-badge file-change">
+                         <FileCode :size="12" aria-hidden="true" /> 文件已更改
+                       </span>
+                     </div>
+                  </div>
+
+                  <p class="card-desc" v-else>{{ model.description || '暂无描述' }}</p>
+
+                  <div class="card-actions">
+                    <button @click="handleApproveModel(model)" class="btn btn--primary btn--sm" :aria-label="`通过模型 ${model.title} 的审核`">
+                      <Check :size="16" aria-hidden="true" /> 通过
+                    </button>
+                    <button @click="handleRejectModel(model)" class="btn btn--outline btn--sm danger" :aria-label="`拒绝模型 ${model.title} 的审核`">
+                      <X :size="16" aria-hidden="true" /> 拒绝
+                    </button>
+                    <router-link :to="`/model/${model.id}`" class="btn btn--ghost btn--sm" :aria-label="`查看模型 ${model.title} 的详情`">
+                      查看详情
+                    </router-link>
+                  </div>
+                </div>
+              </article>
             </div>
           </div>
 
-          <div class="item-actions">
-            <button @click="handleApproveModel(model)" class="btn btn--success btn--sm" title="通过">
-              <Check :size="18" /> 通过
-            </button>
-            <button @click="handleRejectModel(model)" class="btn btn--danger btn--sm" title="拒绝">
-              <X :size="18" /> 拒绝
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Profiles Audit List -->
-    <div v-else-if="activeTab === 'audit_profiles'">
-      <div v-if="pendingProfiles.length === 0" class="empty-state">
-        <div class="empty-icon">
-          <Check :size="48" />
-        </div>
-        <p>没有待审核的资料更新。</p>
-      </div>
-
-      <div v-else class="audit-list">
-        <div v-for="profile in pendingProfiles" :key="profile.id" class="audit-item">
-          <div class="item-preview profile-preview">
-             <div class="old-new-avatar">
-               <div class="avatar-box">
-                 <span>当前</span>
-                 <img :src="profile.avatar_url || 'https://via.placeholder.com/50'" class="avatar-mini">
-               </div>
-               <div v-if="profile.pending_changes?.avatar_url" class="avatar-box">
-                 <span>新</span>
-                 <img :src="profile.pending_changes.avatar_url" class="avatar-mini">
-               </div>
-             </div>
-          </div>
-          
-          <div class="item-info">
-            <h3>{{ profile.username }} <span class="arrow" v-if="profile.pending_changes?.username">→ {{ profile.pending_changes.username }}</span></h3>
-            
-            <div v-if="profile.pending_changes?.bio" class="change-block">
-              <p class="label">简介变更:</p>
-              <p class="old-val">{{ profile.bio || '(无)' }}</p>
-              <p class="new-val">{{ profile.pending_changes.bio }}</p>
+          <!-- Profile Audit List -->
+          <div v-else-if="activeTab === 'audit_profiles'">
+            <div v-if="pendingProfiles.length === 0" class="empty-state" role="alert" aria-live="polite">
+              <div class="empty-illustration" aria-hidden="true">
+                <Check :size="48" />
+              </div>
+              <h3>资料审核已清空</h3>
+              <p>目前没有需要审核的用户资料更新。</p>
             </div>
-            
-            <div v-if="!profile.pending_changes?.username && !profile.pending_changes?.bio && profile.pending_changes?.avatar_url" class="change-block">
-              <p>仅申请更新头像</p>
+
+            <div v-else class="audit-grid">
+              <article v-for="profile in pendingProfiles" :key="profile.id" class="audit-card profile-card">
+                <div class="profile-comparison">
+                  <div class="avatar-side old">
+                    <img :src="profile.avatar_url || 'https://via.placeholder.com/80'" :alt="`${profile.username} 的当前头像`" />
+                    <span>当前</span>
+                  </div>
+                  <ArrowRight :size="20" class="compare-arrow" aria-hidden="true" />
+                  <div class="avatar-side new">
+                    <img :src="profile.pending_changes?.avatar_url || profile.avatar_url || 'https://via.placeholder.com/80'" :alt="`${profile.username} 的申请头像`" />
+                    <span>申请更新</span>
+                  </div>
+                </div>
+
+                <div class="card-body">
+                  <header class="card-header">
+                    <h3 class="card-title">
+                      {{ profile.username }}
+                      <template v-if="profile.pending_changes?.username">
+                        <ArrowRight :size="16" class="title-arrow" aria-hidden="true" />
+                        <span class="new-title">{{ profile.pending_changes.username }}</span>
+                      </template>
+                    </h3>
+                    <p class="user-id">ID: {{ profile.id }}</p>
+                  </header>
+
+                  <div class="card-changes">
+                    <div v-if="profile.pending_changes?.bio" class="change-item">
+                      <span class="change-label">简介更新</span>
+                      <p class="change-content">{{ profile.pending_changes.bio }}</p>
+                    </div>
+                  </div>
+
+                  <div class="card-actions">
+                    <button @click="handleApproveProfile(profile)" class="btn btn--primary btn--sm" aria-label="通过资料审核">
+                      <Check :size="16" aria-hidden="true" /> 通过
+                    </button>
+                    <button @click="handleRejectProfile(profile.id)" class="btn btn--outline btn--sm danger" aria-label="拒绝资料审核">
+                      <X :size="16" aria-hidden="true" /> 拒绝
+                    </button>
+                  </div>
+                </div>
+              </article>
             </div>
           </div>
 
-          <div class="item-actions">
-            <button @click="handleApproveProfile(profile)" class="btn btn--success btn--sm" title="通过">
-              <Check :size="18" /> 通过
-            </button>
-            <button @click="handleRejectProfile(profile.id)" class="btn btn--danger btn--sm" title="拒绝">
-              <X :size="18" /> 拒绝
-            </button>
+          <!-- Model Management -->
+          <div v-else-if="activeTab === 'manage_models'">
+            <div class="table-toolbar">
+              <div class="search-input">
+                <Search :size="18" aria-hidden="true" />
+                <input v-model="modelSearch" type="text" placeholder="搜索模型名称、作者..." aria-label="搜索模型">
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th scope="col">预览</th>
+                    <th scope="col">模型标题</th>
+                    <th scope="col">作者</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">数据</th>
+                    <th scope="col">发布日期</th>
+                    <th scope="col" class="text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="model in filteredModels" :key="model.id">
+                    <td>
+                      <img 
+                        :src="model.image_url || 'https://via.placeholder.com/60x40'" 
+                        :alt="`${model.title} 的缩略图`"
+                        class="table-img"
+                        loading="lazy"
+                        @load="(e) => (e.target as HTMLImageElement).classList.add('loaded')"
+                      >
+                    </td>
+                    <td>
+                      <div class="table-main-info">
+                        <span class="main-text">{{ model.title }}</span>
+                        <span class="sub-text">ID: {{ model.id.slice(0, 8) }}</span>
+                      </div>
+                    </td>
+                    <td>{{ model.profiles?.username || '未知' }}</td>
+                    <td>
+                      <span :class="['status-tag', model.status]">
+                        {{ model.status === 'approved' ? '已发布' : model.status === 'pending' ? '审核中' : '已拒绝' }}
+                      </span>
+                    </td>
+                    <td>
+                      <div class="stats-cell">
+                        <span>下载: {{ model.downloads }}</span>
+                      </div>
+                    </td>
+                    <td>{{ new Date(model.created_at).toLocaleDateString() }}</td>
+                    <td class="text-right">
+                      <div class="table-btns">
+                        <router-link :to="`/model/${model.id}/edit`" class="icon-btn" title="编辑" aria-label="编辑模型">
+                          <Edit :size="18" aria-hidden="true" />
+                        </router-link>
+                        <button @click="handleDeleteModel(model.id)" class="icon-btn danger" title="删除" aria-label="删除模型">
+                          <Trash2 :size="18" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- User Management -->
+          <div v-else-if="activeTab === 'manage_users'">
+            <div class="table-toolbar">
+              <div class="search-input">
+                <Search :size="18" aria-hidden="true" />
+                <input v-model="userSearch" type="text" placeholder="搜索用户名、用户 ID..." aria-label="搜索用户">
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th scope="col">用户</th>
+                    <th scope="col">角色</th>
+                    <th scope="col">资料状态</th>
+                    <th scope="col">注册日期</th>
+                    <th scope="col" class="text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="profile in filteredProfiles" :key="profile.id">
+                    <td>
+                      <div class="user-cell">
+                        <img :src="profile.avatar_url || 'https://via.placeholder.com/40'" :alt="`${profile.username} 的头像`" class="user-avatar">
+                        <div class="user-info">
+                          <span class="username">{{ profile.username }}</span>
+                          <span class="user-id">{{ profile.id }}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span :class="['role-tag', profile.role]">
+                        {{ profile.role === 'admin' ? '管理员' : '普通用户' }}
+                      </span>
+                    </td>
+                    <td>
+                      <span :class="['status-tag', profile.profile_status === 'approved' ? 'approved' : 'pending']">
+                        {{ profile.profile_status === 'approved' ? '正常' : '待审核' }}
+                      </span>
+                    </td>
+                    <td>{{ new Date(profile.created_at).toLocaleDateString() }}</td>
+                    <td class="text-right">
+                      <div class="table-btns">
+                        <button 
+                          @click="handleUpdateUserRole(profile.id, profile.role === 'admin' ? 'user' : 'admin')" 
+                          class="icon-btn" 
+                          :class="profile.role === 'admin' ? 'warning' : 'success'"
+                          :title="profile.role === 'admin' ? '降级为普通用户' : '升级为管理员'"
+                          :aria-label="profile.role === 'admin' ? '降级为普通用户' : '升级为管理员'"
+                        >
+                          <component :is="profile.role === 'admin' ? ShieldAlert : Shield" :size="18" aria-hidden="true" />
+                        </button>
+                        <button @click="handleDeleteUser(profile.id)" class="icon-btn danger" title="删除资料" aria-label="删除用户资料">
+                          <Trash2 :size="18" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- Model Management List -->
-    <div v-else-if="activeTab === 'manage_models'">
-      <div class="management-toolbar">
-        <div class="search-box">
-          <Search :size="18" />
-          <input v-model="modelSearch" type="text" placeholder="搜索模型标题或作者...">
-        </div>
-      </div>
-
-      <div class="management-table-wrapper">
-        <table class="management-table">
-          <thead>
-            <tr>
-              <th>预览</th>
-              <th>标题</th>
-              <th>作者</th>
-              <th>状态</th>
-              <th>下载</th>
-              <th>上传日期</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="model in filteredModels" :key="model.id">
-              <td>
-                <img :src="model.image_url || 'https://via.placeholder.com/40x30'" class="table-preview">
-              </td>
-              <td class="td-title">{{ model.title }}</td>
-              <td>{{ model.profiles?.username || '未知' }}</td>
-              <td>
-                <span :class="['status-badge', model.status]">
-                  {{ model.status === 'approved' ? '已通过' : model.status === 'pending' ? '待审核' : '已拒绝' }}
-                </span>
-              </td>
-              <td>{{ model.downloads }}</td>
-              <td>{{ new Date(model.created_at).toLocaleDateString() }}</td>
-              <td>
-                <div class="table-actions">
-                  <router-link :to="`/model/${model.id}/edit`" class="action-btn" title="编辑">
-                    <Edit :size="18" />
-                  </router-link>
-                  <button @click="handleDeleteModel(model.id)" class="action-btn danger" title="删除">
-                    <Trash2 :size="18" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- User Management List -->
-    <div v-else-if="activeTab === 'manage_users'">
-      <div class="management-toolbar">
-        <div class="search-box">
-          <Search :size="18" />
-          <input v-model="userSearch" type="text" placeholder="搜索用户名或 ID...">
-        </div>
-      </div>
-
-      <div class="management-table-wrapper">
-        <table class="management-table">
-          <thead>
-            <tr>
-              <th>头像</th>
-              <th>用户名</th>
-              <th>角色</th>
-              <th>状态</th>
-              <th>注册日期</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="profile in filteredProfiles" :key="profile.id">
-              <td>
-                <img :src="profile.avatar_url || 'https://via.placeholder.com/32'" class="table-avatar">
-              </td>
-              <td>
-                <div class="user-info-cell">
-                  <span class="username">{{ profile.username }}</span>
-                  <span class="user-id">{{ profile.id }}</span>
-                </div>
-              </td>
-              <td>
-                <span :class="['role-badge', profile.role]">
-                  {{ profile.role === 'admin' ? '管理员' : '普通用户' }}
-                </span>
-              </td>
-              <td>
-                <span :class="['status-badge', profile.profile_status]">
-                  {{ profile.profile_status === 'approved' ? '正常' : '待审核' }}
-                </span>
-              </td>
-              <td>{{ new Date(profile.created_at).toLocaleDateString() }}</td>
-              <td>
-                <div class="table-actions">
-                  <button 
-                    v-if="profile.role === 'user'" 
-                    @click="handleUpdateUserRole(profile.id, 'admin')" 
-                    class="action-btn success" 
-                    title="设为管理员"
-                  >
-                    <Shield :size="18" />
-                  </button>
-                  <button 
-                    v-else 
-                    @click="handleUpdateUserRole(profile.id, 'user')" 
-                    class="action-btn warning" 
-                    title="取消管理员"
-                  >
-                    <ShieldAlert :size="18" />
-                  </button>
-                  <button @click="handleDeleteUser(profile.id)" class="action-btn danger" title="删除资料">
-                    <Trash2 :size="18" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+      </Transition>
+    </main>
   </div>
 </template>
 
@@ -533,418 +566,541 @@ onMounted(() => {
 @use '../styles/themes/variables' as *;
 
 .admin-header {
-  margin-bottom: $spacing-lg;
-  
-  h1 {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--color-text-main);
-  }
-  
-  p {
-    color: var(--color-text-muted);
-  }
-}
-
-.tabs {
   display: flex;
-  gap: $spacing-md;
+  justify-content: space-between;
+  align-items: flex-end;
   margin-bottom: $spacing-xl;
+  padding-bottom: $spacing-lg;
   border-bottom: 1px solid var(--color-border);
-}
-
-.tab-btn {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-md;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  font-weight: 500;
-  color: var(--color-text-muted);
   
-  &.active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
+  .header-content {
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: var(--color-text-main);
+      letter-spacing: -0.02em;
+      margin-bottom: $spacing-xs;
+    }
+    
+    p {
+      color: var(--color-text-muted);
+      font-size: 1.1rem;
+    }
   }
-  
-  &:hover:not(.active) {
-    color: var(--color-text-main);
+
+  .header-stats {
+    display: flex;
+    gap: $spacing-md;
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: $spacing-sm $spacing-lg;
+      background: var(--color-bg-light);
+      border-radius: $radius-lg;
+      border: 1px solid var(--color-border);
+      min-width: 100px;
+
+      .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--color-primary);
+      }
+
+      .stat-label {
+        font-size: 0.75rem;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+    }
   }
-}
 
-.badge {
-  background-color: var(--color-danger);
-  color: white;
-  font-size: 0.75rem;
-  padding: 0 6px;
-  border-radius: $radius-full;
-}
-
-.update-badge {
-  background-color: var(--color-primary);
-  margin-left: 0.5rem;
-}
-
-.new-badge {
-  background-color: #10b981;
-  margin-left: 0.5rem;
-}
-
-.arrow {
-  color: var(--color-primary);
-  font-weight: 400;
-  font-size: 1rem;
-}
-
-.audit-list {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-lg;
-}
-
-.audit-item {
-  display: flex;
-  gap: $spacing-lg;
-  background-color: white;
-  padding: $spacing-lg;
-  border-radius: $radius-lg;
-  border: 1px solid var(--color-border);
-  
   @media (max-width: 768px) {
     flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-md;
+
+    .header-stats {
+      width: 100%;
+      .stat-item { flex: 1; }
+    }
   }
 }
 
-.item-preview {
-  width: 200px;
-  flex-shrink: 0;
-  background-color: #f3f4f6;
-  border-radius: $radius-md;
-  overflow: hidden;
-  
-  &.profile-preview {
-    background: none;
-    width: auto;
-    min-width: 150px;
-  }
-  
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-}
+.tabs-nav {
+  margin-bottom: $spacing-xl;
+  background: var(--color-bg-white);
+  padding: $spacing-xs;
+  border-radius: $radius-xl;
+  border: 1px solid var(--color-border);
+  box-shadow: $shadow-sm;
 
-.old-new-avatar {
-  display: flex;
-  gap: $spacing-md;
-  
-  .avatar-box {
+  .tabs-list {
     display: flex;
-    flex-direction: column;
+    gap: $spacing-xs;
+    flex-wrap: wrap;
+  }
+
+  .tab-btn {
+    display: flex;
     align-items: center;
-    gap: 4px;
-    font-size: 0.75rem;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-lg;
+    background: transparent;
+    border: none;
+    border-radius: $radius-lg;
+    cursor: pointer;
+    font-weight: 600;
     color: var(--color-text-muted);
+    transition: all $transition-base;
+    position: relative;
     
-    .avatar-mini {
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
+    &:hover {
+      color: var(--color-text-main);
+      background: var(--color-bg-light);
+    }
+    
+    &.active {
+      color: white;
+      background: var(--color-primary);
+      box-shadow: 0 4px 12px rgba($color-primary, 0.2);
+
+      .tab-badge {
+        background: white;
+        color: var(--color-primary);
+      }
+    }
+
+    .tab-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: var(--color-danger);
+      color: white;
+      border-radius: $radius-full;
+      transition: all $transition-base;
+    }
+  }
+}
+
+.audit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: $spacing-xl;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.audit-card {
+  display: flex;
+  background: var(--color-bg-white);
+  border-radius: $radius-xl;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  transition: all $transition-base;
+  box-shadow: $shadow-sm;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: $shadow-md;
+    border-color: rgba($color-primary, 0.3);
+  }
+
+  &.profile-card {
+    flex-direction: column;
+    
+    .profile-comparison {
+      height: 140px;
+      background: linear-gradient(135deg, rgba($color-primary, 0.05) 0%, rgba($color-secondary, 0.05) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: $spacing-md;
+
+      .avatar-side {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: $spacing-xs;
+
+        img {
+          width: 70px;
+          height: 70px;
+          border-radius: $radius-full;
+          object-fit: cover;
+          border: 3px solid white;
+          box-shadow: $shadow-sm;
+        }
+
+        span {
+          font-size: 0.7rem;
+          font-weight: 600;
+          color: var(--color-text-muted);
+          text-transform: uppercase;
+        }
+      }
+
+      .compare-arrow {
+        color: var(--color-primary);
+        opacity: 0.5;
+        margin: 0 $spacing-md;
+      }
+    }
+  }
+
+  .card-preview {
+    width: 160px;
+    flex-shrink: 0;
+    position: relative;
+
+    img {
+      width: 100%;
+      height: 100%;
       object-fit: cover;
     }
-  }
-}
 
-.item-info {
-  flex: 1;
-  
-  h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin-bottom: $spacing-xs;
-    color: var(--color-text-main);
-    
-    .arrow {
-      color: var(--color-primary);
-      font-weight: 400;
+    .card-type-tag {
+      position: absolute;
+      top: $spacing-sm;
+      left: $spacing-sm;
+      padding: 2px 8px;
+      border-radius: $radius-sm;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: white;
+      text-transform: uppercase;
+      backdrop-filter: blur(4px);
+
+      &.type-new { background: rgba(#10b981, 0.8); }
+      &.type-update { background: rgba($color-primary, 0.8); }
+    }
+  }
+
+  .card-body {
+    flex: 1;
+    padding: $spacing-lg;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+
+    .card-header {
+      .card-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--color-text-main);
+        margin-bottom: $spacing-xs;
+        display: flex;
+        align-items: center;
+        gap: $spacing-xs;
+        flex-wrap: wrap;
+
+        .title-arrow { color: var(--color-primary); opacity: 0.5; }
+        .new-title { color: var(--color-primary); }
+      }
+
+      .card-meta {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        font-size: 0.85rem;
+        color: var(--color-text-muted);
+
+        .author { display: flex; align-items: center; gap: 4px; }
+        .dot { opacity: 0.5; }
+      }
+
+      .user-id {
+        font-size: 0.8rem;
+        color: var(--color-text-muted);
+        font-family: monospace;
+      }
+    }
+
+    .card-changes {
+      background: var(--color-bg-light);
+      padding: $spacing-sm $spacing-md;
+      border-radius: $radius-lg;
+      font-size: 0.9rem;
+
+      .change-item {
+        &:not(:last-child) { margin-bottom: $spacing-sm; }
+        
+        .change-label {
+          display: block;
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--color-text-muted);
+          text-transform: uppercase;
+          margin-bottom: 2px;
+        }
+
+        .change-content {
+          color: var(--color-text-main);
+          line-height: 1.4;
+        }
+
+        .change-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 8px;
+          background: rgba($color-primary, 0.1);
+          color: var(--color-primary);
+          border-radius: $radius-sm;
+          font-size: 0.75rem;
+          font-weight: 600;
+        }
+      }
+    }
+
+    .card-actions {
+      margin-top: auto;
+      display: flex;
+      gap: $spacing-sm;
+
+      .btn { flex: 1; justify-content: center; }
     }
   }
 }
 
-.change-block {
-  margin-top: $spacing-md;
-  font-size: 0.875rem;
-  
-  .label {
-    font-weight: 600;
-    color: var(--color-text-muted);
-    margin-bottom: 4px;
-  }
-  
-  .old-val {
-    text-decoration: line-through;
-    color: var(--color-text-muted);
-    margin-bottom: 2px;
-  }
-  
-  .new-val {
-    color: var(--color-success, #10b981);
-    background-color: #ecfdf5;
-    padding: 4px 8px;
-    border-radius: $radius-sm;
-    display: inline-block;
-  }
-}
-
-.item-meta {
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  margin-bottom: $spacing-sm;
-  display: flex;
-  gap: $spacing-sm;
-}
-
-.item-desc {
-  color: var(--color-text-main);
-  margin-bottom: $spacing-md;
-  font-size: 0.9375rem;
-}
-
-.item-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $spacing-xs;
-  margin-bottom: $spacing-sm;
-}
-
-.tag {
-  background-color: #f3f4f6;
-  padding: 2px 8px;
-  border-radius: $radius-full;
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
-
-.item-actions {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
-  justify-content: center;
-  
-  @media (max-width: 768px) {
-    flex-direction: row;
-    justify-content: flex-end;
-  }
-}
-
-.btn--success {
-  background-color: var(--color-secondary);
-  color: white;
-  border: none;
-  
-  &:hover {
-    opacity: 0.9;
-  }
-}
-
-.loading, .empty-state {
-  text-align: center;
-  padding: $spacing-2xl;
-  color: var(--color-text-muted);
-}
-
-.empty-icon {
-  color: var(--color-secondary);
-  margin-bottom: $spacing-md;
-}
-
-// Management styles
-.management-toolbar {
+.table-toolbar {
+  margin-bottom: $spacing-lg;
   display: flex;
   justify-content: flex-end;
-  margin-bottom: $spacing-lg;
+
+  .search-input {
+    position: relative;
+    width: 320px;
+
+    svg {
+      position: absolute;
+      left: $spacing-md;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--color-text-muted);
+      pointer-events: none;
+    }
+
+    input {
+      width: 100%;
+      padding: $spacing-sm $spacing-md $spacing-sm 40px;
+      background: var(--color-bg-white);
+      border: 1px solid var(--color-border);
+      border-radius: $radius-lg;
+      font-size: 0.95rem;
+      transition: all $transition-base;
+
+      &:focus {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 4px rgba($color-primary, 0.1);
+        outline: none;
+      }
+    }
+  }
+
+  @media (max-width: 480px) {
+    .search-input { width: 100%; }
+  }
 }
 
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-  background-color: white;
+.table-container {
+  background: var(--color-bg-white);
+  border-radius: $radius-xl;
   border: 1px solid var(--color-border);
-  border-radius: $radius-md;
-  padding: 0 $spacing-md;
-  width: 300px;
-  
-  &:focus-within {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba($color-primary, 0.1);
-  }
-  
-  input {
-    border: none;
-    outline: none;
-    padding: $spacing-sm 0;
-    width: 100%;
-    font-size: 0.875rem;
-  }
-  
-  color: var(--color-text-muted);
-}
-
-.management-table-wrapper {
-  background-color: white;
-  border-radius: $radius-lg;
-  border: 1px solid var(--color-border);
+  box-shadow: $shadow-sm;
   overflow: hidden;
   overflow-x: auto;
 }
 
-.management-table {
+.admin-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 0.875rem;
-  
+  font-size: 0.95rem;
+
   th {
-    background-color: #f9fafb;
-    padding: $spacing-md;
-    font-weight: 600;
+    background: var(--color-bg-light);
+    padding: $spacing-md $spacing-lg;
+    font-weight: 700;
     color: var(--color-text-muted);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
     border-bottom: 1px solid var(--color-border);
   }
-  
+
   td {
-    padding: $spacing-md;
+    padding: $spacing-md $spacing-lg;
     border-bottom: 1px solid var(--color-border);
     vertical-align: middle;
   }
-  
-  tr:last-child td {
-    border-bottom: none;
-  }
-  
-  .table-preview {
-    width: 40px;
-    height: 30px;
+
+  tr:last-child td { border-bottom: none; }
+
+  .table-img {
+    width: 60px;
+    height: 40px;
     object-fit: cover;
     border-radius: $radius-sm;
-  }
-  
-  .table-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-  }
-  
-  .td-title {
-    font-weight: 500;
-    color: var(--color-text-main);
-  }
-}
+    box-shadow: $shadow-sm;
+    background-color: #f1f5f9;
+    transition: $transition-base;
+    opacity: 0;
 
-.user-info-cell {
-  display: flex;
-  flex-direction: column;
-  
-  .username {
-    font-weight: 500;
-    color: var(--color-text-main);
+    &.loaded {
+      opacity: 1;
+    }
   }
-  
-  .user-id {
-    font-size: 0.75rem;
+
+  .table-main-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .main-text {
+      font-weight: 600;
+      color: var(--color-text-main);
+    }
+
+    .sub-text {
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      font-family: monospace;
+    }
+  }
+
+  .user-cell {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: $radius-full;
+      object-fit: cover;
+      box-shadow: $shadow-sm;
+    }
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+
+      .username { font-weight: 600; color: var(--color-text-main); }
+      .user-id { font-size: 0.75rem; color: var(--color-text-muted); font-family: monospace; }
+    }
+  }
+
+  .status-tag, .role-tag {
+    display: inline-flex;
+    padding: 2px 10px;
+    border-radius: $radius-full;
+    font-size: 0.8rem;
+    font-weight: 600;
+
+    &.approved, &.success { background: #ecfdf5; color: #059669; }
+    &.pending, &.warning { background: #fffbeb; color: #d97706; }
+    &.rejected, &.danger { background: #fef2f2; color: #dc2626; }
+    &.admin { background: #eef2ff; color: #4f46e5; }
+    &.user { background: #f3f4f6; color: #4b5563; }
+  }
+
+  .stats-cell {
+    font-size: 0.85rem;
     color: var(--color-text-muted);
+    font-weight: 500;
+  }
+
+  .table-btns {
+    display: flex;
+    gap: $spacing-xs;
+    justify-content: flex-end;
   }
 }
 
-.status-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: $radius-full;
-  font-size: 0.75rem;
-  font-weight: 500;
-  
-  &.approved {
-    background-color: #ecfdf5;
-    color: #065f46;
-  }
-  
-  &.pending, &.pending_review {
-    background-color: #fffbeb;
-    color: #92400e;
-  }
-  
-  &.rejected {
-    background-color: #fef2f2;
-    color: #991b1b;
-  }
-}
-
-.role-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: $radius-full;
-  font-size: 0.75rem;
-  font-weight: 500;
-  
-  &.admin {
-    background-color: #eef2ff;
-    color: #3730a3;
-  }
-  
-  &.user {
-    background-color: #f3f4f6;
-    color: #374151;
-  }
-}
-
-.table-actions {
-  display: flex;
-  gap: $spacing-xs;
-}
-
-.action-btn {
+.icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: $radius-md;
+  width: 36px;
+  height: 36px;
+  border-radius: $radius-lg;
   border: 1px solid var(--color-border);
-  background-color: white;
+  background: var(--color-bg-white);
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: $transition-base;
-  text-decoration: none;
+  transition: all $transition-base;
   
   &:hover {
     color: var(--color-primary);
     border-color: var(--color-primary);
-    background-color: #f5f3ff;
+    background: rgba($color-primary, 0.05);
+    transform: translateY(-2px);
   }
-  
+
   &.danger:hover {
     color: var(--color-danger);
     border-color: var(--color-danger);
-    background-color: #fef2f2;
+    background: rgba($color-danger, 0.05);
   }
-  
+
   &.success:hover {
-    color: var(--color-secondary);
-    border-color: var(--color-secondary);
-    background-color: #ecfdf5;
+    color: #059669;
+    border-color: #059669;
+    background: rgba(#059669, 0.05);
   }
-  
+
   &.warning:hover {
     color: #d97706;
     border-color: #d97706;
-    background-color: #fffbeb;
+    background: rgba(#d97706, 0.05);
   }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-2xl 0;
+  color: var(--color-text-muted);
+  text-align: center;
+
+  .empty-illustration {
+    width: 80px;
+    height: 80px;
+    background: var(--color-bg-light);
+    border-radius: $radius-full;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: $spacing-lg;
+    color: var(--color-primary);
+    opacity: 0.5;
+  }
+
+  h3 { font-size: 1.25rem; font-weight: 600; color: var(--color-text-main); margin-bottom: $spacing-xs; }
+  p { font-size: 1rem; }
+}
+
+.text-right { text-align: right; }
+
+// Transition
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 </style>

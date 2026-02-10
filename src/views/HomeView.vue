@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { supabase } from '../supabase/client'
-import { Search, Download, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { Search, ChevronLeft, ChevronRight, Plus } from 'lucide-vue-next'
 import { useHead } from '@vueuse/head'
 import type { Model } from '../types'
+import LoadingSpinner from '../components/LoadingSpinner.vue'
+import ModelCard from '../components/ModelCard.vue'
+import { useModelStore } from '../stores/models'
 
 useHead({
   title: 'YSM 模型站 - 免费下载 Minecraft Yes Steve Model 模型',
@@ -14,40 +16,31 @@ useHead({
   ]
 })
 
-const models = ref<Model[]>([])
+const modelStore = useModelStore()
+const localModels = ref<Model[]>([])
 const loading = ref(true)
 const searchQuery = ref('')
 const page = ref(1)
 const pageSize = 12
 const totalCount = ref(0)
 
-const fetchModels = async () => {
+const fetchModels = async (force: boolean = false) => {
   loading.value = true
   
-  let query = supabase
-    .from('models')
-    .select('*, profiles(username)', { count: 'exact' })
-    .eq('is_public', true)
-    .eq('status', 'approved')
-    .order('created_at', { ascending: false })
-
-  if (searchQuery.value) {
-    query = query.ilike('title', `%${searchQuery.value}%`)
-  }
-
-  const from = (page.value - 1) * pageSize
-  const to = from + pageSize - 1
-  
-  query = query.range(from, to)
-
-  const { data, count, error } = await query
-
-  if (error) {
-    console.error(error)
+  // Use store for first page no search
+  if (page.value === 1 && !searchQuery.value) {
+    await modelStore.fetchModels(page.value, pageSize, '', force)
+    localModels.value = modelStore.models
+    totalCount.value = modelStore.totalCount
   } else {
-    models.value = data as any
-    totalCount.value = count || 0
+    // For other cases, fetch directly but still use the store's logic helper
+    const result = await modelStore.fetchModels(page.value, pageSize, searchQuery.value, true)
+    if (result) {
+      localModels.value = result.data as any
+      totalCount.value = result.count || 0
+    }
   }
+  
   loading.value = false
 }
 
@@ -75,74 +68,64 @@ const changePage = (newPage: number) => {
       <h1>发现 YSM 模型</h1>
       <p>浏览并下载社区创作的玩家模型</p>
       
-      <div class="search-bar">
+      <div class="search-bar" role="search">
         <input 
           v-model="searchQuery" 
           @keyup.enter="handleSearch" 
           type="text" 
           placeholder="搜索模型..." 
           class="input"
+          aria-label="搜索模型"
         >
-        <button @click="handleSearch" class="btn btn--primary">
-          <Search :size="20" />
+        <button @click="handleSearch" class="btn btn--primary" aria-label="开始搜索">
+          <Search :size="20" aria-hidden="true" />
         </button>
       </div>
     </div>
 
-    <div v-if="loading" class="loading">
-      正在加载模型...
-    </div>
+    <LoadingSpinner v-if="loading" message="正在寻找优质模型..." aria-live="polite" :aria-busy="true" />
 
-    <div v-else-if="models.length === 0" class="empty-state">
-      <p>未找到模型。快来成为第一个上传者吧！</p>
-      <RouterLink to="/upload" class="btn btn--primary">上传模型</RouterLink>
-    </div>
-
-    <div v-else class="model-grid">
-      <div 
-        v-for="model in models" 
-        :key="model.id" 
-        class="model-card"
-      >
-        <RouterLink :to="`/model/${model.id}`" class="model-image-link">
-          <div class="model-image">
-            <img :src="model.image_url || 'https://via.placeholder.com/400x300?text=暂无预览'" :alt="model.title">
-          </div>
-        </RouterLink>
-        <div class="model-info">
-          <RouterLink :to="`/model/${model.id}`" class="model-title-link">
-            <h3 class="model-title">{{ model.title }}</h3>
-          </RouterLink>
-          <RouterLink :to="`/user/${model.user_id}`" class="model-author">作者：{{ model.profiles?.username || '未知' }}</RouterLink>
-          <div class="model-meta">
-            <span class="meta-item">
-              <Download :size="14" /> {{ model.downloads }}
-            </span>
-            <!-- <span class="meta-item">
-              <Heart :size="14" /> 0
-            </span> -->
-          </div>
-        </div>
+    <div v-else-if="localModels.length === 0" class="empty-state" role="alert" aria-live="polite">
+      <div class="empty-icon" aria-hidden="true">
+        <Plus :size="48" />
       </div>
+      <h3>暂无模型</h3>
+      <p>未找到相关模型。快来成为第一个上传者吧！</p>
+      <RouterLink to="/upload" class="btn btn--primary">
+        <Plus :size="20" aria-hidden="true" /> 立即上传
+      </RouterLink>
     </div>
 
-    <div v-if="totalCount > pageSize" class="pagination">
-      <button 
-        @click="changePage(page - 1)" 
-        :disabled="page === 1" 
-        class="btn btn--secondary pagination-btn"
-      >
-        <ChevronLeft :size="20" />
-      </button>
-      <span class="pagination-info">{{ page }} / {{ Math.ceil(totalCount / pageSize) }}</span>
-      <button 
-        @click="changePage(page + 1)" 
-        :disabled="page >= Math.ceil(totalCount / pageSize)" 
-        class="btn btn--secondary pagination-btn"
-      >
-        <ChevronRight :size="20" />
-      </button>
-    </div>
+    <main v-else class="content-section" aria-live="polite">
+      <div class="model-grid">
+        <ModelCard 
+          v-for="(model, index) in localModels" 
+          :key="model.id" 
+          :model="model"
+          :index="index"
+        />
+      </div>
+
+      <nav v-if="totalCount > pageSize" class="pagination" role="navigation" aria-label="分页导航">
+        <button 
+          @click="changePage(page - 1)" 
+          :disabled="page === 1" 
+          class="btn btn--secondary pagination-btn"
+          aria-label="上一页"
+        >
+          <ChevronLeft :size="20" aria-hidden="true" />
+        </button>
+        <span class="pagination-info" aria-current="page">第 {{ page }} 页 / 共 {{ Math.ceil(totalCount / pageSize) }} 页</span>
+        <button 
+          @click="changePage(page + 1)" 
+          :disabled="page >= Math.ceil(totalCount / pageSize)" 
+          class="btn btn--secondary pagination-btn"
+          aria-label="下一页"
+        >
+          <ChevronRight :size="20" aria-hidden="true" />
+        </button>
+      </nav>
+    </main>
   </div>
 </template>
 
@@ -151,19 +134,27 @@ const changePage = (newPage: number) => {
 
 .hero {
   text-align: center;
-  padding: $spacing-2xl 0;
+  padding: $spacing-3xl 0;
+  background: radial-gradient(circle at top, rgba($color-primary, 0.1) 0%, transparent 70%);
   
   h1 {
-    font-size: 2.5rem;
-    font-weight: 800;
+    font-size: 3.5rem;
+    font-weight: 900;
     margin-bottom: $spacing-md;
     color: var(--color-text-main);
+    letter-spacing: -0.025em;
+    background: linear-gradient(135deg, var(--color-text-main) 0%, var(--color-primary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
   
   p {
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     color: var(--color-text-muted);
-    margin-bottom: $spacing-xl;
+    margin-bottom: $spacing-2xl;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
   }
 }
 
@@ -172,102 +163,76 @@ const changePage = (newPage: number) => {
   margin: 0 auto;
   display: flex;
   gap: $spacing-sm;
+  background: white;
+  padding: $spacing-xs;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-lg;
+  border: 1px solid var(--color-border);
+  transition: $transition-base;
+
+  &:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: $shadow-xl;
+    transform: translateY(-2px);
+  }
+
+  .input {
+    border: none;
+    box-shadow: none;
+    padding-left: $spacing-lg;
+    font-size: 1.125rem;
+    
+    &:focus {
+      box-shadow: none;
+    }
+  }
+
+  .btn {
+    padding: $spacing-md $spacing-xl;
+    border-radius: $radius-lg;
+  }
+}
+
+.pagination-info {
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.empty-state {
+  text-align: center;
+  padding: $spacing-3xl 0;
+  
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: $spacing-md;
+  }
+
+  h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: $spacing-xs;
+  }
+
+  p {
+    color: var(--color-text-muted);
+    margin-bottom: $spacing-xl;
+  }
+}
+
+.content-section {
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .model-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: $spacing-lg;
-  padding-bottom: $spacing-2xl;
-}
-
-.model-card {
-  background-color: white;
-  border: 1px solid var(--color-border);
-  border-radius: $radius-lg;
-  overflow: hidden;
-  transition: $transition-base;
-  display: flex;
-  flex-direction: column;
-
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: $shadow-lg;
-    border-color: var(--color-primary);
-  }
-}
-
-.model-image {
-  aspect-ratio: 4/3;
-  background-color: #f3f4f6;
-  overflow: hidden;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-}
-
-.model-image-link {
-  display: block;
-}
-
-.model-info {
-  padding: $spacing-md;
-}
-
-.model-title-link {
-  text-decoration: none;
-  display: block;
-  color: inherit;
-  
-  &:hover .model-title {
-    color: var(--color-primary);
-  }
-}
-
-.model-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--color-text-main);
-  margin-bottom: $spacing-xs;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: color 0.2s;
-}
-
-.model-author {
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  margin-bottom: $spacing-md;
-  display: inline-block;
-  text-decoration: none;
-  transition: color 0.2s;
-  
-  &:hover {
-    color: var(--color-primary);
-  }
-}
-
-.model-meta {
-  display: flex;
-  gap: $spacing-md;
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.loading, .empty-state {
-  text-align: center;
-  padding: $spacing-2xl;
-  color: var(--color-text-muted);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: $spacing-xl;
+  padding-bottom: $spacing-3xl;
 }
 
 .pagination {
@@ -289,10 +254,5 @@ const changePage = (newPage: number) => {
     opacity: 0.5;
     cursor: not-allowed;
   }
-}
-
-.pagination-info {
-  font-weight: 500;
-  color: var(--color-text-muted);
 }
 </style>
