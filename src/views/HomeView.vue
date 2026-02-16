@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Search, ChevronLeft, ChevronRight, Plus } from 'lucide-vue-next'
+import { Search, ChevronLeft, ChevronRight, Plus, Megaphone } from 'lucide-vue-next'
 import { useHead } from '@vueuse/head'
 import type { Model } from '../types'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
@@ -80,6 +80,21 @@ const changePage = (newPage: number) => {
         <button @click="handleSearch" class="btn btn--primary" aria-label="开始搜索">
           <Search :size="20" aria-hidden="true" />
         </button>
+      </div>
+    </div>
+
+    <!-- Announcement Banner -->
+    <div class="announcement-banner" role="alert" aria-live="polite">
+      <div class="announcement-icon">
+        <Megaphone :size="24" aria-hidden="true" />
+      </div>
+      <div class="announcement-content">
+        <h3>站点公告</h3>
+        <ul>
+          <li>🎉 <strong>马年快乐！</strong></li>
+          <li>ℹ️ 本站为公益网站，如有侵权行为，请联系站长协调处理有问题模型。</li>
+          <li>📧 此外，我们只能提供账号邮箱，模型管理。</li>
+        </ul>
       </div>
     </div>
 
@@ -253,6 +268,65 @@ const changePage = (newPage: number) => {
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+}
+
+.announcement-banner {
+  background: linear-gradient(to right, #fff1f2, #fff);
+  border: 1px solid #fecdd3;
+  border-left: 4px solid #f43f5e;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-xl;
+  display: flex;
+  gap: $spacing-lg;
+  align-items: flex-start;
+  box-shadow: $shadow-sm;
+
+  .announcement-icon {
+    color: #f43f5e;
+    padding: $spacing-sm;
+    background: rgba(244, 63, 94, 0.1);
+    border-radius: $radius-full;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .announcement-content {
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #881337; // Rose 900
+      margin-bottom: $spacing-sm;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      
+      li {
+        margin-bottom: $spacing-xs;
+        color: #9f1239; // Rose 800
+        line-height: 1.5;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    gap: $spacing-md;
+    align-items: flex-start;
+    
+    .announcement-icon {
+      margin-bottom: $spacing-xs;
+    }
   }
 }
 </style>
