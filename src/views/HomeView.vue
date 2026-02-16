@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Search, ChevronLeft, ChevronRight, Plus, Megaphone } from 'lucide-vue-next'
+import { Search, ChevronLeft, ChevronRight, Plus, Megaphone, ShieldCheck, Mail, Sparkles } from 'lucide-vue-next'
 import { useHead } from '@vueuse/head'
 import type { Model } from '../types'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
@@ -84,16 +84,45 @@ const changePage = (newPage: number) => {
     </div>
 
     <!-- Announcement Banner -->
-    <div class="announcement-banner" role="alert" aria-live="polite">
-      <div class="announcement-icon">
-        <Megaphone :size="24" aria-hidden="true" />
-      </div>
-      <div class="announcement-content">
-        <h3>站点公告</h3>
-        <ul>
-          <li>🎉 <strong>马年快乐！</strong></li>
-          <li>ℹ️ 本站为公益网站，如有侵权行为，请联系站长协调处理有问题模型。</li>
-        </ul>
+    <div class="announcement-card" role="alert" aria-live="polite">
+      <div class="card-decoration"></div>
+      <div class="card-content">
+        <div class="announcement-header">
+          <div class="tag">
+            <Megaphone :size="14" class="icon" /> 
+            <span>站务公告</span>
+          </div>
+          <span class="date">2026 马年新春</span>
+        </div>
+        
+        <div class="main-message">
+          <div class="icon-wrapper">
+            <Sparkles :size="24" class="sparkle-icon" />
+          </div>
+          <h3>马年快乐！</h3>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="item-icon red">
+              <ShieldCheck :size="18" />
+            </div>
+            <div class="item-text">
+              <strong>公益声明</strong>
+              <p>本站为非营利性公益网站。如有侵权行为，请联系站长协调处理相关模型。</p>
+            </div>
+          </div>
+
+          <div class="info-item">
+            <div class="item-icon blue">
+              <Mail :size="18" />
+            </div>
+            <div class="item-text">
+              <strong>服务范围</strong>
+              <p>目前仅提供账号邮箱绑定与基础模型管理服务。</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -270,62 +299,148 @@ const changePage = (newPage: number) => {
   }
 }
 
-.announcement-banner {
-  background: linear-gradient(to right, #fff1f2, #fff);
-  border: 1px solid #fecdd3;
-  border-left: 4px solid #f43f5e;
-  border-radius: $radius-lg;
-  padding: $spacing-lg;
-  margin-bottom: $spacing-xl;
-  display: flex;
-  gap: $spacing-lg;
-  align-items: flex-start;
-  box-shadow: $shadow-sm;
+.announcement-card {
+  background: white;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-md;
+  margin-bottom: $spacing-2xl;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 
-  .announcement-icon {
-    color: #f43f5e;
-    padding: $spacing-sm;
-    background: rgba(244, 63, 94, 0.1);
-    border-radius: $radius-full;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-lg;
   }
 
-  .announcement-content {
-    h3 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: #881337; // Rose 900
-      margin-bottom: $spacing-sm;
+  .card-decoration {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(to bottom, #ef4444, #f59e0b); // Red to Amber for festive feel
+  }
+
+  .card-content {
+    padding: $spacing-lg;
+  }
+
+  .announcement-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-lg;
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: #fef2f2; // Red 50
+      color: #dc2626; // Red 600
+      border-radius: $radius-full;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+
+      .icon { stroke-width: 2.5px; }
     }
 
-    ul {
-      list-style: none;
-      padding: 0;
+    .date {
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+      font-weight: 500;
+    }
+  }
+
+  .main-message {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+    margin-bottom: $spacing-xl;
+
+    .icon-wrapper {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #ef4444, #f59e0b);
+      border-radius: $radius-lg;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+
+      .sparkle-icon {
+        animation: pulse 2s infinite;
+      }
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(to right, #dc2626, #d97706);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
       margin: 0;
-      
-      li {
-        margin-bottom: $spacing-xs;
-        color: #9f1239; // Rose 800
-        line-height: 1.5;
-        
-        &:last-child {
-          margin-bottom: 0;
+    }
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: $spacing-lg;
+    padding-top: $spacing-lg;
+    border-top: 1px solid var(--color-border);
+
+    .info-item {
+      display: flex;
+      gap: $spacing-md;
+
+      .item-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: $radius-md;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+
+        &.red {
+          background: #fef2f2;
+          color: #ef4444;
+        }
+
+        &.blue {
+          background: #eff6ff;
+          color: #3b82f6;
+        }
+      }
+
+      .item-text {
+        strong {
+          display: block;
+          font-size: 0.9rem;
+          color: var(--color-text-main);
+          margin-bottom: 2px;
+        }
+
+        p {
+          font-size: 0.85rem;
+          color: var(--color-text-muted);
+          line-height: 1.5;
+          margin: 0;
         }
       }
     }
   }
+}
 
-  @media (max-width: 640px) {
-    flex-direction: column;
-    gap: $spacing-md;
-    align-items: flex-start;
-    
-    .announcement-icon {
-      margin-bottom: $spacing-xs;
-    }
-  }
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 </style>
