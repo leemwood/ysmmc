@@ -93,7 +93,6 @@ const changePage = (newPage: number) => {
         <ul>
           <li>🎉 <strong>马年快乐！</strong></li>
           <li>ℹ️ 本站为公益网站，如有侵权行为，请联系站长协调处理有问题模型。</li>
-          <li>📧 此外，我们只能提供账号邮箱，模型管理。</li>
         </ul>
       </div>
     </div>
