@@ -124,6 +124,13 @@ onMounted(async () => {
         资料审核
         <Badge v-if="pendingProfiles.length > 0" variant="destructive" class="ml-1">{{ pendingProfiles.length }}</Badge>
       </button>
+      <RouterLink
+        to="/admin/users"
+        class="flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <Users class="h-4 w-4" />
+        用户管理
+      </RouterLink>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/pkg/auth"
 	"github.com/ysmmc/backend/pkg/response"
 )
@@ -42,8 +43,20 @@ func Auth() gin.HandlerFunc {
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get("role")
-		if !exists || role != "admin" {
+		if !exists || !model.IsAdmin(role.(string)) {
 			response.Forbidden(c, "admin access required")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+func SuperAdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("role")
+		if !exists || !model.IsSuperAdmin(role.(string)) {
+			response.Forbidden(c, "super admin access required")
 			c.Abort()
 			return
 		}
@@ -59,4 +72,9 @@ func GetUserID(c *gin.Context) uuid.UUID {
 func GetRole(c *gin.Context) string {
 	role, _ := c.Get("role")
 	return role.(string)
+}
+
+func GetEmail(c *gin.Context) string {
+	email, _ := c.Get("email")
+	return email.(string)
 }

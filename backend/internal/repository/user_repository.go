@@ -7,19 +7,21 @@ import (
 	"gorm.io/gorm"
 )
 
-type UserRepository struct{}
+type UserRepository struct {
+	DB *gorm.DB
+}
 
 func NewUserRepository() *UserRepository {
-	return &UserRepository{}
+	return &UserRepository{DB: database.DB}
 }
 
 func (r *UserRepository) Create(user *model.User) error {
-	return database.DB.Create(user).Error
+	return r.DB.Create(user).Error
 }
 
 func (r *UserRepository) FindByID(id uuid.UUID) (*model.User, error) {
 	var user model.User
-	err := database.DB.First(&user, "id = ?", id).Error
+	err := r.DB.First(&user, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +30,7 @@ func (r *UserRepository) FindByID(id uuid.UUID) (*model.User, error) {
 
 func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
 	var user model.User
-	err := database.DB.Where("email = ?", email).First(&user).Error
+	err := r.DB.Where("email = ?", email).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +39,7 @@ func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
 
 func (r *UserRepository) FindByUsername(username string) (*model.User, error) {
 	var user model.User
-	err := database.DB.Where("username = ?", username).First(&user).Error
+	err := r.DB.Where("username = ?", username).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -45,27 +47,27 @@ func (r *UserRepository) FindByUsername(username string) (*model.User, error) {
 }
 
 func (r *UserRepository) Update(user *model.User) error {
-	return database.DB.Save(user).Error
+	return r.DB.Save(user).Error
 }
 
 func (r *UserRepository) Delete(id uuid.UUID) error {
-	return database.DB.Delete(&model.User{}, "id = ?", id).Error
+	return r.DB.Delete(&model.User{}, "id = ?", id).Error
 }
 
 func (r *UserRepository) List(page, pageSize int) ([]model.User, int64, error) {
 	var users []model.User
 	var total int64
 
-	database.DB.Model(&model.User{}).Count(&total)
+	r.DB.Model(&model.User{}).Count(&total)
 
 	offset := (page - 1) * pageSize
-	err := database.DB.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&users).Error
+	err := r.DB.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&users).Error
 	return users, total, err
 }
 
 func (r *UserRepository) FindByResetToken(token string) (*model.User, error) {
 	var user model.User
-	err := database.DB.Where("reset_token = ?", token).First(&user).Error
+	err := r.DB.Where("reset_token = ?", token).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +76,16 @@ func (r *UserRepository) FindByResetToken(token string) (*model.User, error) {
 
 func (r *UserRepository) FindByVerificationToken(token string) (*model.User, error) {
 	var user model.User
-	err := database.DB.Where("verification_token = ?", token).First(&user).Error
+	err := r.DB.Where("verification_token = ?", token).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *UserRepository) FindByEmailChangeToken(token string) (*model.User, error) {
+	var user model.User
+	err := r.DB.Where("email_change_token = ?", token).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +96,19 @@ func (r *UserRepository) ListPendingProfiles(page, pageSize int) ([]model.User, 
 	var users []model.User
 	var total int64
 
-	query := database.DB.Model(&model.User{}).Where("profile_status = ?", "pending_review")
+	query := r.DB.Model(&model.User{}).Where("profile_status = ?", "pending_review")
+	query.Count(&total)
+
+	offset := (page - 1) * pageSize
+	err := query.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&users).Error
+	return users, total, err
+}
+
+func (r *UserRepository) ListByRole(role string, page, pageSize int) ([]model.User, int64, error) {
+	var users []model.User
+	var total int64
+
+	query := r.DB.Model(&model.User{}).Where("role = ?", role)
 	query.Count(&total)
 
 	offset := (page - 1) * pageSize
@@ -95,28 +118,28 @@ func (r *UserRepository) ListPendingProfiles(page, pageSize int) ([]model.User, 
 
 func (r *UserRepository) ExistsByEmail(email string) bool {
 	var count int64
-	database.DB.Model(&model.User{}).Where("email = ?", email).Count(&count)
+	r.DB.Model(&model.User{}).Where("email = ?", email).Count(&count)
 	return count > 0
 }
 
 func (r *UserRepository) ExistsByUsername(username string) bool {
 	var count int64
-	database.DB.Model(&model.User{}).Where("username = ?", username).Count(&count)
+	r.DB.Model(&model.User{}).Where("username = ?", username).Count(&count)
 	return count > 0
 }
 
 func (r *UserRepository) Count() (int64, error) {
 	var count int64
-	err := database.DB.Model(&model.User{}).Count(&count).Error
+	err := r.DB.Model(&model.User{}).Count(&count).Error
 	return count, err
 }
 
 func (r *UserRepository) CountByRole(role string) (int64, error) {
 	var count int64
-	err := database.DB.Model(&model.User{}).Where("role = ?", role).Count(&count).Error
+	err := r.DB.Model(&model.User{}).Where("role = ?", role).Count(&count).Error
 	return count, err
 }
 
 func (r *UserRepository) Transaction(fn func(*gorm.DB) error) error {
-	return database.DB.Transaction(fn)
+	return r.DB.Transaction(fn)
 }

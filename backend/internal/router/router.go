@@ -27,6 +27,9 @@ func Setup(r *gin.Engine) {
 			auth.POST("/refresh", authHandler.RefreshToken)
 			auth.POST("/forgot-password", authHandler.ForgotPassword)
 			auth.POST("/reset-password", authHandler.ResetPassword)
+			auth.GET("/verify", authHandler.VerifyEmail)
+			auth.POST("/change-email", middleware.Auth(), authHandler.ChangeEmail)
+			auth.GET("/verify-email-change", authHandler.VerifyEmailChange)
 			auth.GET("/me", middleware.Auth(), authHandler.Me)
 		}
 
@@ -77,12 +80,17 @@ func Setup(r *gin.Engine) {
 		admin.Use(middleware.AdminOnly())
 		{
 			admin.GET("/stats", adminHandler.GetStats)
+			admin.GET("/super-admin", adminHandler.GetSuperAdmin)
 			admin.GET("/models/pending", adminHandler.ListPendingModels)
 			admin.GET("/models/pending-updates", adminHandler.ListPendingUpdates)
 			admin.PUT("/models/:id/approve", adminHandler.ApproveModel)
 			admin.PUT("/models/:id/reject", adminHandler.RejectModel)
 			admin.GET("/users", adminHandler.ListUsers)
 			admin.PUT("/users/:id/role", adminHandler.UpdateUserRole)
+			admin.PUT("/users/:id/admin", middleware.SuperAdminOnly(), adminHandler.SetAdmin)
+			admin.DELETE("/users/:id/admin", middleware.SuperAdminOnly(), adminHandler.RemoveAdmin)
+			admin.PUT("/users/:id/ban", adminHandler.BanUser)
+			admin.PUT("/users/:id/unban", adminHandler.UnbanUser)
 			admin.GET("/profiles/pending", adminHandler.ListPendingProfiles)
 			admin.PUT("/profiles/:id/approve", adminHandler.ApproveProfile)
 			admin.PUT("/profiles/:id/reject", adminHandler.RejectProfile)

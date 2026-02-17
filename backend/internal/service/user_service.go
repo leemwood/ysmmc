@@ -106,8 +106,18 @@ func (s *UserService) UpdateRole(userID uuid.UUID, role string) error {
 		return err
 	}
 
-	if role != "user" && role != "admin" {
+	if role != "user" && role != "admin" && role != "super_admin" {
 		return errors.New("invalid role")
+	}
+
+	user.Role = role
+	return s.userRepo.Update(user)
+}
+
+func (s *UserService) SetRole(userID uuid.UUID, role string) error {
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return err
 	}
 
 	user.Role = role
@@ -158,4 +168,16 @@ func (s *UserService) Delete(userID uuid.UUID) error {
 
 func (s *UserService) Count() (int64, error) {
 	return s.userRepo.Count()
+}
+
+func (s *UserService) GetSuperAdmin() (*model.User, error) {
+	users, _, err := s.userRepo.ListByRole("super_admin", 1, 1)
+	if err != nil || len(users) == 0 {
+		return nil, errors.New("super admin not found")
+	}
+	return &users[0], nil
+}
+
+func (s *UserService) Update(user *model.User) error {
+	return s.userRepo.Update(user)
 }

@@ -121,3 +121,50 @@ func (h *AuthHandler) Me(c *gin.Context) {
 
 	response.Success(c, user)
 }
+
+func (h *AuthHandler) VerifyEmail(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		response.BadRequest(c, "token is required")
+		return
+	}
+
+	if err := h.authService.VerifyEmail(token); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.SuccessWithMessage(c, "email verified successfully", nil)
+}
+
+func (h *AuthHandler) ChangeEmail(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	var req service.ChangeEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.authService.ChangeEmail(userID, req.NewEmail); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.SuccessWithMessage(c, "verification email sent to new address", nil)
+}
+
+func (h *AuthHandler) VerifyEmailChange(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		response.BadRequest(c, "token is required")
+		return
+	}
+
+	if err := h.authService.VerifyEmailChange(token); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.SuccessWithMessage(c, "email changed successfully", nil)
+}

@@ -2,9 +2,12 @@ package handler
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/ysmmc/backend/internal/middleware"
+	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
 )
@@ -233,4 +236,126 @@ func (h *AdminHandler) GetStats(c *gin.Context) {
 		"pending_models":  pendingModels,
 		"total_downloads": totalDownloads,
 	})
+}
+
+func (h *AdminHandler) GetSuperAdmin(c *gin.Context) {
+	user, err := h.userService.GetSuperAdmin()
+	if err != nil {
+		response.NotFound(c, "super admin not found")
+		return
+	}
+
+	response.Success(c, user)
+}
+
+func (h *AdminHandler) SetAdmin(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid user id")
+		return
+	}
+
+	if err := h.userService.SetRole(id, "admin"); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.SuccessWithMessage(c, "admin role granted", nil)
+}
+
+func (h *AdminHandler) RemoveAdmin(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid user id")
+		return
+	}
+
+	user, err := h.userService.GetByID(id)
+	if err != nil {
+		response.NotFound(c, "user not found")
+		return
+	}
+
+	if model.IsSuperAdmin(user.Role) {
+		response.BadRequest(c, "cannot remove super admin role")
+		return
+	}
+
+	if err := h.userService.SetRole(id, "user"); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.SuccessWithMessage(c, "admin role removed", nil)
+}
+
+func (h *AdminHandler) BanUser(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid user id")
+		return
+	}
+
+	currentRole := middleware.GetRole(c)
+	targetUser, err := h.userService.GetByID(id)
+	if err != nil {
+		response.NotFound(c, "user not found")
+		return
+	}
+
+	if model.IsSuperAdmin(targetUser.Role) {
+		response.BadRequest(c, "cannot ban super admin")
+		return
+	}
+
+	if model.IsAdmin(targetUser.Role) && !model.IsSuperAdmin(currentRole) {
+		response.Forbidden(c, "only super admin can ban admin users")
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	now := time.Now()
+	targetUser.IsBanned = true
+	targetUser.BannedAt = &now
+	targetUser.BannedReason = &req.Reason
+
+	if err := h.userService.Update(targetUser); err != nil {
+		response.InternalError(c, "failed to ban user")
+		return
+	}
+
+	response.SuccessWithMessage(c, "user banned successfully", nil)
+}
+
+func (h *AdminHandler) UnbanUser(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid user id")
+		return
+	}
+
+	user, err := h.userService.GetByID(id)
+	if err != nil {
+		response.NotFound(c, "user not found")
+		return
+	}
+
+	user.IsBanned = false
+	user.BannedAt = nil
+	user.BannedReason = nil
+
+	if err := h.userService.Update(user); err != nil {
+		response.InternalError(c, "failed to unban user")
+		return
+	}
+
+	response.SuccessWithMessage(c, "user unbanned successfully", nil)
 }

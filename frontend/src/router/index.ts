@@ -26,6 +26,18 @@ const routes: RouteRecordRaw[] = [
     meta: { guest: true },
   },
   {
+    path: '/verify-email',
+    name: 'verify-email',
+    component: () => import('@/views/VerifyEmailView.vue'),
+    meta: { guest: true },
+  },
+  {
+    path: '/verify-email-change',
+    name: 'verify-email-change',
+    component: () => import('@/views/VerifyEmailChangeView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/upload',
     name: 'upload',
     component: () => import('@/views/UploadView.vue'),
@@ -52,6 +64,12 @@ const routes: RouteRecordRaw[] = [
     path: '/admin',
     name: 'admin',
     component: () => import('@/views/AdminDashboardView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/users',
+    name: 'admin-users',
+    component: () => import('@/views/admin/AdminUsersView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {

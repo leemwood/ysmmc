@@ -37,10 +37,14 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	AccessToken  string     `json:"access_token"`
-	RefreshToken string     `json:"refresh_token"`
-	ExpiresIn    int64      `json:"expires_in"`
+	AccessToken  string      `json:"access_token"`
+	RefreshToken string      `json:"refresh_token"`
+	ExpiresIn    int64       `json:"expires_in"`
 	User         *model.User `json:"user"`
+}
+
+type ChangeEmailRequest struct {
+	NewEmail string `json:"new_email" binding:"required,email"`
 }
 
 func (s *AuthService) Register(req *RegisterRequest) (*model.User, error) {
@@ -57,11 +61,20 @@ func (s *AuthService) Register(req *RegisterRequest) (*model.User, error) {
 		return nil, err
 	}
 
+	var userRole string
+	var count int64
+	s.userRepo.DB.Model(&model.User{}).Count(&count)
+	if count == 0 {
+		userRole = "super_admin"
+	} else {
+		userRole = "user"
+	}
+
 	user := &model.User{
 		Email:         req.Email,
 		PasswordHash:  passwordHash,
 		Username:      req.Username,
-		Role:          "user",
+		Role:          userRole,
 		ProfileStatus: "approved",
 		EmailVerified: false,
 	}
@@ -86,6 +99,10 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	user, err := s.userRepo.FindByEmail(req.Email)
 	if err != nil {
 		return nil, errors.New("invalid email or password")
+	}
+
+	if user.IsBanned {
+		return nil, errors.New("your account has been banned")
 	}
 
 	if !auth.CheckPassword(req.Password, user.PasswordHash) {
@@ -116,12 +133,20 @@ func (s *AuthService) RefreshToken(refreshToken string) (*auth.TokenPair, error)
 		return nil, errors.New("user not found")
 	}
 
+	if user.IsBanned {
+		return nil, errors.New("your account has been banned")
+	}
+
 	return auth.GenerateToken(user.ID, user.Email, user.Role)
 }
 
 func (s *AuthService) ForgotPassword(emailAddr string) error {
 	user, err := s.userRepo.FindByEmail(emailAddr)
 	if err != nil {
+		return nil
+	}
+
+	if user.IsBanned {
 		return nil
 	}
 
@@ -173,6 +198,51 @@ func (s *AuthService) VerifyEmail(token string) error {
 
 	user.EmailVerified = true
 	user.VerificationToken = nil
+
+	return s.userRepo.Update(user)
+}
+
+func (s *AuthService) ChangeEmail(userID uuid.UUID, newEmail string) error {
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+
+	if s.userRepo.ExistsByEmail(newEmail) {
+		return errors.New("email already in use")
+	}
+
+	changeToken := uuid.New().String()
+	user.NewEmail = &newEmail
+	user.EmailChangeToken = &changeToken
+
+	if err := s.userRepo.Update(user); err != nil {
+		return err
+	}
+
+	if s.emailService.IsConfigured() {
+		verifyLink := fmt.Sprintf("%s/verify-email-change?token=%s", config.AppConfig.FrontendURL, changeToken)
+		go s.emailService.Send(newEmail, "验证新邮箱 - YSM模型站",
+			fmt.Sprintf(`<html><body><h2>验证新邮箱</h2><p>您正在修改邮箱地址，请点击以下链接验证新邮箱：</p><p><a href="%s">%s</a></p><p>此链接将在1小时后失效。</p></body></html>`, verifyLink, verifyLink))
+	}
+
+	return nil
+}
+
+func (s *AuthService) VerifyEmailChange(token string) error {
+	user, err := s.userRepo.FindByEmailChangeToken(token)
+	if err != nil {
+		return errors.New("invalid email change token")
+	}
+
+	if user.NewEmail == nil {
+		return errors.New("no pending email change")
+	}
+
+	user.Email = *user.NewEmail
+	user.NewEmail = nil
+	user.EmailChangeToken = nil
+	user.EmailVerified = true
 
 	return s.userRepo.Update(user)
 }

@@ -9,7 +9,8 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshToken = ref<string | null>(localStorage.getItem('refresh_token'))
 
   const isAuthenticated = computed(() => !!token.value)
-  const isAdmin = computed(() => user.value?.role === 'admin')
+  const isAdmin = computed(() => user.value?.role === 'admin' || user.value?.role === 'super_admin')
+  const isSuperAdmin = computed(() => user.value?.role === 'super_admin')
 
   async function login(email: string, password: string) {
     const response = await authApi.login({ email, password })
@@ -67,6 +68,7 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken,
     isAuthenticated,
     isAdmin,
+    isSuperAdmin,
     login,
     register,
     fetchUser,

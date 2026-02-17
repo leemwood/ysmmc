@@ -52,6 +52,15 @@ export const authApi = {
   resetPassword: (token: string, password: string) =>
     api.post<ApiResponse<null>>('/auth/reset-password', { token, password }),
 
+  verifyEmail: (token: string) =>
+    api.get<ApiResponse<null>>('/auth/verify', { params: { token } }),
+
+  changeEmail: (newEmail: string) =>
+    api.post<ApiResponse<null>>('/auth/change-email', { new_email: newEmail }),
+
+  verifyEmailChange: (token: string) =>
+    api.get<ApiResponse<null>>('/auth/verify-email-change', { params: { token } }),
+
   me: () => api.get<ApiResponse<User>>('/auth/me'),
 }
 
@@ -141,6 +150,9 @@ export const adminApi = {
       }>
     >('/admin/stats'),
 
+  getSuperAdmin: () =>
+    api.get<ApiResponse<User>>('/admin/super-admin'),
+
   listPendingModels: (page = 1, pageSize = 20) =>
     api.get<ApiResponse<PaginatedResponse<Model>>>('/admin/models/pending', {
       params: { page, page_size: pageSize },
@@ -163,6 +175,18 @@ export const adminApi = {
 
   updateUserRole: (id: string, role: string) =>
     api.put<ApiResponse<null>>(`/admin/users/${id}/role`, { role }),
+
+  setAdmin: (id: string) =>
+    api.put<ApiResponse<null>>(`/admin/users/${id}/admin`),
+
+  removeAdmin: (id: string) =>
+    api.delete<ApiResponse<null>>(`/admin/users/${id}/admin`),
+
+  banUser: (id: string, reason: string) =>
+    api.put<ApiResponse<null>>(`/admin/users/${id}/ban`, { reason }),
+
+  unbanUser: (id: string) =>
+    api.put<ApiResponse<null>>(`/admin/users/${id}/unban`),
 
   listPendingProfiles: (page = 1, pageSize = 20) =>
     api.get<ApiResponse<PaginatedResponse<User>>>('/admin/profiles/pending', {

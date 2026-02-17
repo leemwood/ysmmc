@@ -4,9 +4,13 @@ export interface User {
   username: string
   avatar_url: string | null
   bio: string | null
-  role: 'user' | 'admin'
+  role: 'user' | 'admin' | 'super_admin'
   profile_status: 'approved' | 'pending_review'
   pending_changes: PendingChanges | null
+  email_verified: boolean
+  is_banned: boolean
+  banned_at: string | null
+  banned_reason: string | null
   created_at: string
 }
 

@@ -62,24 +62,24 @@ func Seed() error {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	admin := model.User{
+	superAdmin := model.User{
 		ID:            uuid.New(),
 		Email:         "admin@ysmmc.local",
 		PasswordHash:  string(passwordHash),
 		Username:      "admin",
-		Role:          "admin",
+		Role:          "super_admin",
 		ProfileStatus: "approved",
 		EmailVerified: true,
 	}
 
-	if err := DB.Create(&admin).Error; err != nil {
-		return fmt.Errorf("failed to create admin user: %w", err)
+	if err := DB.Create(&superAdmin).Error; err != nil {
+		return fmt.Errorf("failed to create super admin user: %w", err)
 	}
 
 	announcement := model.Announcement{
-		ID:      uuid.New(),
-		Title:   "Welcome to YSM Model Station",
-		Content: "This is a model sharing platform where you can upload, download and share your model works.",
+		ID:       uuid.New(),
+		Title:    "Welcome to YSM Model Station",
+		Content:  "This is a model sharing platform where you can upload, download and share your model works.",
 		IsActive: true,
 	}
 
@@ -87,6 +87,6 @@ func Seed() error {
 		return fmt.Errorf("failed to create announcement: %w", err)
 	}
 
-	log.Println("Database seeded successfully")
+	log.Println("Database seeded successfully (super_admin created)")
 	return nil
 }
