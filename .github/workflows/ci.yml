@@ -1,11 +1,17 @@
-name: Build and Deploy
+name: Build and Release
 
 on:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-backend:
@@ -66,7 +72,9 @@ jobs:
     name: Create Release
     needs: [build-backend, build-frontend]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -85,6 +93,7 @@ jobs:
 
       - name: Copy Config Files
         run: |
+          mkdir -p release/migrations
           cp backend/.env.example release/.env.example
           cp backend/migrations/001_init.sql release/migrations/
           cp -r backend/templates release/templates/
@@ -96,15 +105,9 @@ jobs:
           tar -czvf ysmmc-linux-amd64.tar.gz *
           mv ysmmc-linux-amd64.tar.gz ..
 
-      - name: Get Version
-        id: version
-        run: echo "VERSION=$(date +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.version.outputs.VERSION }}
-          name: Release ${{ steps.version.outputs.VERSION }}
           files: ysmmc-linux-amd64.tar.gz
           draft: false
           prerelease: false
