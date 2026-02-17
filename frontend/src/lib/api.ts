@@ -1,8 +1,10 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios'
 import type { ApiResponse, LoginResponse, User, Model, PaginatedResponse, Announcement, Favorite } from '@/types'
 
+const isDev = import.meta.env.DEV
+
 const api: AxiosInstance = axios.create({
-  baseURL: '/api',
+  baseURL: isDev ? '/api' : 'http://api.ysmmc.cn/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

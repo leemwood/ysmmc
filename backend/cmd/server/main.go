@@ -18,10 +18,13 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Tables already created by SQL migration script
-	// if err := database.Migrate(); err != nil {
-	// 	log.Fatalf("Failed to migrate database: %v", err)
-	// }
+	if err := database.Migrate(); err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	if err := database.Seed(); err != nil {
+		log.Fatalf("Failed to seed database: %v", err)
+	}
 
 	gin.SetMode(config.AppConfig.GinMode)
 
