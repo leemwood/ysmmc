@@ -6,6 +6,16 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { LayoutDashboard, Package, Users, Download, Check, X, Loader2, FileText } from 'lucide-vue-next'
 
 const activeTab = ref('overview')
@@ -18,6 +28,24 @@ const stats = ref({
 })
 const pendingModels = ref<Model[]>([])
 const pendingProfiles = ref<User[]>([])
+
+const rejectDialog = ref(false)
+const rejectModelId = ref('')
+const rejectReason = ref('')
+const rejecting = ref(false)
+
+const successMessage = ref('')
+const errorMessage = ref('')
+
+function showSuccess(msg: string) {
+  successMessage.value = msg
+  setTimeout(() => { successMessage.value = '' }, 3000)
+}
+
+function showError(msg: string) {
+  errorMessage.value = msg
+  setTimeout(() => { errorMessage.value = '' }, 3000)
+}
 
 async function fetchStats() {
   try {
@@ -49,41 +77,57 @@ async function fetchPendingProfiles() {
 async function approveModel(id: string) {
   try {
     await adminApi.approveModel(id)
+    showSuccess('模型已通过审核')
     fetchPendingModels()
     fetchStats()
-  } catch (error) {
-    console.error('Failed to approve model:', error)
+  } catch (error: any) {
+    showError(error.response?.data?.message || '操作失败')
   }
 }
 
-async function rejectModel(id: string) {
-  const reason = prompt('请输入拒绝原因:')
-  if (!reason) return
+function openRejectDialog(id: string) {
+  rejectModelId.value = id
+  rejectReason.value = ''
+  rejectDialog.value = true
+}
+
+async function rejectModel() {
+  if (!rejectReason.value.trim()) {
+    showError('请输入拒绝原因')
+    return
+  }
   
+  rejecting.value = true
   try {
-    await adminApi.rejectModel(id, reason)
+    await adminApi.rejectModel(rejectModelId.value, rejectReason.value)
+    showSuccess('模型已拒绝')
+    rejectDialog.value = false
     fetchPendingModels()
     fetchStats()
-  } catch (error) {
-    console.error('Failed to reject model:', error)
+  } catch (error: any) {
+    showError(error.response?.data?.message || '操作失败')
+  } finally {
+    rejecting.value = false
   }
 }
 
 async function approveProfile(id: string) {
   try {
     await adminApi.approveProfile(id)
+    showSuccess('资料已通过审核')
     fetchPendingProfiles()
-  } catch (error) {
-    console.error('Failed to approve profile:', error)
+  } catch (error: any) {
+    showError(error.response?.data?.message || '操作失败')
   }
 }
 
 async function rejectProfile(id: string) {
   try {
     await adminApi.rejectProfile(id)
+    showSuccess('资料变更已拒绝')
     fetchPendingProfiles()
-  } catch (error) {
-    console.error('Failed to reject profile:', error)
+  } catch (error: any) {
+    showError(error.response?.data?.message || '操作失败')
   }
 }
 
@@ -96,6 +140,13 @@ onMounted(async () => {
 <template>
   <div class="mx-auto max-w-6xl px-4 py-8">
     <h1 class="mb-6 text-2xl font-bold">管理后台</h1>
+
+    <div v-if="successMessage" class="mb-4 rounded-md bg-green-500/10 p-3 text-sm text-green-600">
+      {{ successMessage }}
+    </div>
+    <div v-if="errorMessage" class="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+      {{ errorMessage }}
+    </div>
 
     <div class="mb-6 flex gap-4 border-b">
       <button
@@ -217,7 +268,7 @@ onMounted(async () => {
                   <Check class="mr-1 h-4 w-4" />
                   通过
                 </Button>
-                <Button size="sm" variant="destructive" @click="rejectModel(model.id)">
+                <Button size="sm" variant="destructive" @click="openRejectDialog(model.id)">
                   <X class="mr-1 h-4 w-4" />
                   拒绝
                 </Button>
@@ -266,5 +317,31 @@ onMounted(async () => {
         </div>
       </div>
     </template>
+
+    <Dialog v-model:open="rejectDialog">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>拒绝模型</DialogTitle>
+          <DialogDescription>请输入拒绝原因，将通知上传者</DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label>拒绝原因</Label>
+            <Textarea 
+              v-model="rejectReason" 
+              placeholder="请输入拒绝原因..."
+              :rows="3"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="rejectDialog = false">取消</Button>
+          <Button variant="destructive" @click="rejectModel" :disabled="rejecting">
+            <Loader2 v-if="rejecting" class="mr-2 h-4 w-4 animate-spin" />
+            确认拒绝
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { userApi, modelApi, favoriteApi } from '@/lib/api'
+import { userApi, modelApi, favoriteApi, uploadApi, authApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import type { Model, Favorite, PaginatedResponse } from '@/types'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -12,7 +12,15 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouterLink } from 'vue-router'
-import { User, Save, Loader2, Heart, Package } from 'lucide-vue-next'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { User, Save, Loader2, Heart, Package, Camera, Key, Mail } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 
@@ -25,6 +33,22 @@ const favorites = ref<Favorite[]>([])
 const loadingModels = ref(true)
 const loadingFavorites = ref(true)
 const message = ref('')
+
+const avatarFile = ref<File | null>(null)
+const avatarPreview = ref<string | null>(null)
+const uploadingAvatar = ref(false)
+
+const passwordDialog = ref(false)
+const oldPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const changingPassword = ref(false)
+const passwordMessage = ref('')
+
+const emailDialog = ref(false)
+const newEmail = ref('')
+const changingEmail = ref(false)
+const emailMessage = ref('')
 
 async function loadProfile() {
   if (authStore.user) {
@@ -68,14 +92,133 @@ async function handleUpdateProfile() {
       bio: bio.value,
     })
     await authStore.fetchUser()
-    message.value = '资料更新成功'
-    if (!authStore.isAdmin) {
+    if (authStore.isAdmin) {
+      message.value = '资料更新成功'
+    } else {
       message.value = '资料更新已提交审核'
     }
   } catch (error: any) {
     message.value = error.response?.data?.message || '更新失败'
   } finally {
     loading.value = false
+  }
+}
+
+const MAX_AVATAR_SIZE = 2 * 1024 * 1024
+
+function handleAvatarChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files[0]) {
+    const file = target.files[0]
+    
+    if (file.size > MAX_AVATAR_SIZE) {
+      message.value = '图片大小不能超过2MB'
+      return
+    }
+    
+    if (!file.type.startsWith('image/')) {
+      message.value = '请选择有效的图片文件'
+      return
+    }
+    
+    avatarFile.value = file
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      avatarPreview.value = e.target?.result as string
+    }
+    reader.readAsDataURL(avatarFile.value)
+    message.value = ''
+  }
+}
+
+async function uploadAvatar() {
+  if (!avatarFile.value) return
+
+  uploadingAvatar.value = true
+  try {
+    const uploadResponse = await uploadApi.uploadImage(avatarFile.value)
+    const avatarUrl = uploadResponse.data.data?.url
+
+    if (avatarUrl) {
+      await userApi.updateMe({ avatar_url: avatarUrl })
+      await authStore.fetchUser()
+      avatarFile.value = null
+      avatarPreview.value = null
+      message.value = '头像更新成功'
+    }
+  } catch (error: any) {
+    message.value = error.response?.data?.message || '头像上传失败'
+  } finally {
+    uploadingAvatar.value = false
+  }
+}
+
+function openPasswordDialog() {
+  oldPassword.value = ''
+  newPassword.value = ''
+  confirmPassword.value = ''
+  passwordMessage.value = ''
+  passwordDialog.value = true
+}
+
+async function changePassword() {
+  if (!oldPassword.value || !newPassword.value || !confirmPassword.value) {
+    passwordMessage.value = '请填写所有字段'
+    return
+  }
+
+  if (newPassword.value !== confirmPassword.value) {
+    passwordMessage.value = '两次输入的密码不一致'
+    return
+  }
+
+  if (newPassword.value.length < 6) {
+    passwordMessage.value = '密码长度至少6位'
+    return
+  }
+
+  changingPassword.value = true
+  try {
+    await userApi.changePassword({
+      old_password: oldPassword.value,
+      new_password: newPassword.value,
+    })
+    passwordDialog.value = false
+    message.value = '密码修改成功'
+  } catch (error: any) {
+    passwordMessage.value = error.response?.data?.message || '密码修改失败'
+  } finally {
+    changingPassword.value = false
+  }
+}
+
+function openEmailDialog() {
+  newEmail.value = ''
+  emailMessage.value = ''
+  emailDialog.value = true
+}
+
+async function changeEmail() {
+  if (!newEmail.value) {
+    emailMessage.value = '请输入新邮箱地址'
+    return
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(newEmail.value)) {
+    emailMessage.value = '请输入有效的邮箱地址'
+    return
+  }
+
+  changingEmail.value = true
+  try {
+    await authApi.changeEmail(newEmail.value)
+    emailDialog.value = false
+    message.value = '验证邮件已发送到新邮箱，请查收'
+  } catch (error: any) {
+    emailMessage.value = error.response?.data?.message || '发送失败'
+  } finally {
+    changingEmail.value = false
   }
 }
 
@@ -126,16 +269,41 @@ onMounted(() => {
               {{ message }}
             </div>
 
-            <div class="flex items-center gap-4">
-              <Avatar class="h-20 w-20">
-                <AvatarImage :src="authStore.user?.avatar_url || undefined">
-                  <User class="h-8 w-8" />
-                </AvatarImage>
-              </Avatar>
+            <div class="flex items-start gap-6">
+              <div class="relative group">
+                <Avatar class="h-24 w-24">
+                  <AvatarImage v-if="avatarPreview || authStore.user?.avatar_url" :src="avatarPreview || authStore.user?.avatar_url || undefined">
+                    <User class="h-12 w-12 text-muted-foreground" />
+                  </AvatarImage>
+                </Avatar>
+                <label class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                  <Camera class="h-6 w-6 text-white" />
+                  <input type="file" accept="image/*" class="hidden" @change="handleAvatarChange" />
+                </label>
+              </div>
+              <div class="flex-1 space-y-3">
+                <div v-if="avatarPreview" class="flex gap-2">
+                  <Button size="sm" @click="uploadAvatar" :disabled="uploadingAvatar">
+                    <Loader2 v-if="uploadingAvatar" class="mr-2 h-4 w-4 animate-spin" />
+                    保存头像
+                  </Button>
+                  <Button size="sm" variant="outline" @click="avatarPreview = null; avatarFile = null">
+                    取消
+                  </Button>
+                </div>
+                <p class="text-sm text-muted-foreground">点击头像更换图片</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-4 pt-2">
               <div>
                 <p class="font-medium">{{ authStore.user?.username }}</p>
                 <p class="text-sm text-muted-foreground">{{ authStore.user?.email }}</p>
-                <Badge v-if="authStore.isAdmin" variant="default" class="mt-1">管理员</Badge>
+                <div class="flex items-center gap-2 mt-1">
+                  <Badge v-if="authStore.user?.role === 'super_admin'" variant="default">站长</Badge>
+                  <Badge v-else-if="authStore.isAdmin" variant="secondary">管理员</Badge>
+                  <Badge v-if="authStore.user?.email_verified" variant="outline" class="text-green-600">已验证</Badge>
+                </div>
               </div>
             </div>
 
@@ -153,11 +321,21 @@ onMounted(() => {
               资料修改正在审核中
             </div>
 
-            <Button type="submit" :disabled="loading">
-              <Loader2 v-if="loading" class="mr-2 h-4 w-4 animate-spin" />
-              <Save v-else class="mr-2 h-4 w-4" />
-              保存修改
-            </Button>
+            <div class="flex gap-2">
+              <Button type="submit" :disabled="loading">
+                <Loader2 v-if="loading" class="mr-2 h-4 w-4 animate-spin" />
+                <Save v-else class="mr-2 h-4 w-4" />
+                保存修改
+              </Button>
+              <Button type="button" variant="outline" @click="openPasswordDialog">
+                <Key class="mr-2 h-4 w-4" />
+                修改密码
+              </Button>
+              <Button type="button" variant="outline" @click="openEmailDialog">
+                <Mail class="mr-2 h-4 w-4" />
+                修改邮箱
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
@@ -191,7 +369,7 @@ onMounted(() => {
                   {{ model.title }}
                 </RouterLink>
                 <div class="mt-1 flex items-center gap-2">
-                  <Badge :variant="model.status === 'approved' ? 'success' : model.status === 'rejected' ? 'destructive' : 'secondary'">
+                  <Badge :variant="model.status === 'approved' ? 'default' : model.status === 'rejected' ? 'destructive' : 'secondary'">
                     {{ model.status === 'approved' ? '已通过' : model.status === 'rejected' ? '已拒绝' : '审核中' }}
                   </Badge>
                   <span class="text-xs text-muted-foreground">{{ model.downloads }} 下载</span>
@@ -234,5 +412,63 @@ onMounted(() => {
         </Card>
       </div>
     </div>
+
+    <Dialog v-model:open="passwordDialog">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>修改密码</DialogTitle>
+          <DialogDescription>请输入旧密码和新密码</DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label>旧密码</Label>
+            <Input v-model="oldPassword" type="password" placeholder="请输入旧密码" />
+          </div>
+          <div class="space-y-2">
+            <Label>新密码</Label>
+            <Input v-model="newPassword" type="password" placeholder="请输入新密码（至少6位）" />
+          </div>
+          <div class="space-y-2">
+            <Label>确认密码</Label>
+            <Input v-model="confirmPassword" type="password" placeholder="请再次输入新密码" />
+          </div>
+          <div v-if="passwordMessage" class="text-sm text-destructive">{{ passwordMessage }}</div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="passwordDialog = false">取消</Button>
+          <Button @click="changePassword" :disabled="changingPassword">
+            <Loader2 v-if="changingPassword" class="mr-2 h-4 w-4 animate-spin" />
+            确认修改
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="emailDialog">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>修改邮箱</DialogTitle>
+          <DialogDescription>新邮箱需要验证后才能生效</DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label>当前邮箱</Label>
+            <Input :model-value="authStore.user?.email" disabled />
+          </div>
+          <div class="space-y-2">
+            <Label>新邮箱</Label>
+            <Input v-model="newEmail" type="email" placeholder="请输入新邮箱地址" />
+          </div>
+          <div v-if="emailMessage" class="text-sm text-destructive">{{ emailMessage }}</div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="emailDialog = false">取消</Button>
+          <Button @click="changeEmail" :disabled="changingEmail">
+            <Loader2 v-if="changingEmail" class="mr-2 h-4 w-4 animate-spin" />
+            发送验证邮件
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

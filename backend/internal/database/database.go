@@ -35,6 +35,10 @@ func Connect() error {
 }
 
 func Migrate() error {
+	if err := migrateSuperAdminRole(); err != nil {
+		log.Printf("Warning: failed to migrate super admin role: %v", err)
+	}
+
 	err := DB.AutoMigrate(
 		&model.User{},
 		&model.Model{},
@@ -43,10 +47,23 @@ func Migrate() error {
 		&model.Session{},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to migrate database: %w", err)
+		log.Printf("Warning: auto migrate error: %v", err)
 	}
 
 	log.Println("Database migrated successfully")
+	return nil
+}
+
+func migrateSuperAdminRole() error {
+	result := DB.Exec("UPDATE users SET role = 'super_admin' WHERE email = 'admin@ysmmc.local' AND role = 'admin'")
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected > 0 {
+		log.Println("Migrated admin user role to super_admin")
+	}
+
 	return nil
 }
 

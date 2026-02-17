@@ -11,6 +11,9 @@ import { Upload, X, Loader2 } from 'lucide-vue-next'
 
 const router = useRouter()
 
+const MAX_FILE_SIZE = 100 * 1024 * 1024
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+
 const title = ref('')
 const description = ref('')
 const tags = ref('')
@@ -20,29 +23,57 @@ const imageFile = ref<File | null>(null)
 const imagePreview = ref('')
 const loading = ref(false)
 const error = ref('')
+const uploadProgress = ref(0)
 
 function handleFileChange(e: Event) {
   const target = e.target as HTMLInputElement
   if (target.files && target.files[0]) {
-    file.value = target.files[0]
+    const selectedFile = target.files[0]
+    
+    if (selectedFile.size > MAX_FILE_SIZE) {
+      error.value = '模型文件大小不能超过100MB'
+      return
+    }
+    
+    file.value = selectedFile
+    error.value = ''
   }
 }
 
 function handleImageChange(e: Event) {
   const target = e.target as HTMLInputElement
   if (target.files && target.files[0]) {
-    imageFile.value = target.files[0]
+    const selectedFile = target.files[0]
+    
+    if (selectedFile.size > MAX_IMAGE_SIZE) {
+      error.value = '图片大小不能超过5MB'
+      return
+    }
+    
+    if (!selectedFile.type.startsWith('image/')) {
+      error.value = '请选择有效的图片文件'
+      return
+    }
+    
+    imageFile.value = selectedFile
     const reader = new FileReader()
     reader.onload = (e) => {
       imagePreview.value = e.target?.result as string
     }
     reader.readAsDataURL(imageFile.value)
+    error.value = ''
   }
 }
 
 function removeImage() {
   imageFile.value = null
   imagePreview.value = ''
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
 async function handleSubmit() {
@@ -59,17 +90,21 @@ async function handleSubmit() {
   }
 
   loading.value = true
+  uploadProgress.value = 0
 
   try {
+    uploadProgress.value = 30
     const modelUpload = await uploadApi.uploadModel(file.value)
     const modelData = modelUpload.data.data!
 
+    uploadProgress.value = 60
     let imageUrl = ''
     if (imageFile.value) {
       const imageUpload = await uploadApi.uploadImage(imageFile.value)
       imageUrl = imageUpload.data.data!.url
     }
 
+    uploadProgress.value = 80
     await modelApi.create({
       title: title.value,
       description: description.value,
@@ -80,11 +115,13 @@ async function handleSubmit() {
       is_public: isPublic.value,
     })
 
+    uploadProgress.value = 100
     router.push('/profile')
   } catch (err: any) {
     error.value = err.response?.data?.message || '上传失败，请重试'
   } finally {
     loading.value = false
+    uploadProgress.value = 0
   }
 }
 </script>
@@ -134,13 +171,17 @@ async function handleSubmit() {
               @change="handleFileChange"
               required
             />
-            <p v-if="file" class="text-sm text-muted-foreground">
-              已选择: {{ file.name }}
+            <p class="text-sm text-muted-foreground">
+              支持 .ysm, .zip 格式，最大 100MB
+            </p>
+            <p v-if="file" class="text-sm text-primary">
+              已选择: {{ file.name }} ({{ formatFileSize(file.size) }})
             </p>
           </div>
 
           <div class="space-y-2">
             <Label>预览图</Label>
+            <p class="text-sm text-muted-foreground">支持 jpg, png, gif 格式，最大 5MB</p>
             <div v-if="imagePreview" class="relative inline-block">
               <img :src="imagePreview" class="h-40 w-auto rounded-md object-cover" />
               <Button
@@ -164,6 +205,19 @@ async function handleSubmit() {
               class="h-4 w-4 rounded border-gray-300"
             />
             <Label for="isPublic">公开显示</Label>
+          </div>
+
+          <div v-if="loading && uploadProgress > 0" class="space-y-2">
+            <div class="flex justify-between text-sm">
+              <span>上传进度</span>
+              <span>{{ uploadProgress }}%</span>
+            </div>
+            <div class="h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                class="h-full bg-primary transition-all duration-300"
+                :style="{ width: uploadProgress + '%' }"
+              ></div>
+            </div>
           </div>
 
           <Button type="submit" class="w-full" :disabled="loading">

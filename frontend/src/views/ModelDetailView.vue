@@ -9,6 +9,14 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Download, Heart, Edit, Trash2, User, Calendar, Tag, ArrowLeft } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -20,9 +28,19 @@ const loading = ref(true)
 const isFavorited = ref(false)
 const favoriteCount = ref(0)
 
+const loginPromptDialog = ref(false)
+const actionMessage = ref('')
+const actionMessageType = ref<'success' | 'error'>('success')
+
 const isOwner = computed(() => {
   return authStore.user?.id === model.value?.user_id
 })
+
+function showActionMessage(msg: string, type: 'success' | 'error' = 'success') {
+  actionMessage.value = msg
+  actionMessageType.value = type
+  setTimeout(() => { actionMessage.value = '' }, 3000)
+}
 
 async function fetchModel() {
   loading.value = true
@@ -53,19 +71,26 @@ async function handleDownload() {
 }
 
 async function toggleFavorite() {
-  if (!model.value || !authStore.isAuthenticated) return
+  if (!model.value) return
+
+  if (!authStore.isAuthenticated) {
+    loginPromptDialog.value = true
+    return
+  }
 
   try {
     if (isFavorited.value) {
       await modelApi.removeFavorite(model.value.id)
       favoriteCount.value--
+      showActionMessage('已取消收藏')
     } else {
       await modelApi.addFavorite(model.value.id)
       favoriteCount.value++
+      showActionMessage('收藏成功')
     }
     isFavorited.value = !isFavorited.value
-  } catch (error) {
-    console.error('Failed to toggle favorite:', error)
+  } catch (error: any) {
+    showActionMessage(error.response?.data?.message || '操作失败', 'error')
   }
 }
 
@@ -101,6 +126,12 @@ onMounted(fetchModel)
       <ArrowLeft class="mr-2 h-4 w-4" />
       返回
     </Button>
+
+    <div v-if="actionMessage" 
+      class="mb-4 rounded-md p-3 text-sm"
+      :class="actionMessageType === 'success' ? 'bg-green-500/10 text-green-600' : 'bg-destructive/10 text-destructive'">
+      {{ actionMessage }}
+    </div>
 
     <div v-if="loading" class="space-y-4">
       <Skeleton class="h-8 w-2/3" />
@@ -162,7 +193,6 @@ onMounted(fetchModel)
         <Button
           :variant="isFavorited ? 'default' : 'outline'"
           @click="toggleFavorite"
-          :disabled="!authStore.isAuthenticated"
         >
           <Heart class="mr-2 h-4 w-4" :class="{ 'fill-current': isFavorited }" />
           {{ isFavorited ? '已收藏' : '收藏' }} ({{ favoriteCount }})
@@ -197,5 +227,18 @@ onMounted(fetchModel)
         </CardContent>
       </Card>
     </template>
+
+    <Dialog v-model:open="loginPromptDialog">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>请先登录</DialogTitle>
+          <DialogDescription>收藏功能需要登录后才能使用</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" @click="loginPromptDialog = false">取消</Button>
+          <Button @click="router.push('/login')">去登录</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

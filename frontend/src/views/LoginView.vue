@@ -18,15 +18,19 @@ const password = ref('')
 const username = ref('')
 const confirmPassword = ref('')
 const error = ref('')
+const success = ref('')
 const loading = ref(false)
 
 async function handleSubmit() {
   error.value = ''
+  success.value = ''
   loading.value = true
 
   try {
     if (isLogin.value) {
       await authStore.login(email.value, password.value)
+      const redirect = route.query.redirect as string
+      router.push(redirect || '/')
     } else {
       if (password.value !== confirmPassword.value) {
         error.value = '两次输入的密码不一致'
@@ -38,12 +42,17 @@ async function handleSubmit() {
         loading.value = false
         return
       }
+      if (password.value.length < 6) {
+        error.value = '密码至少需要6个字符'
+        loading.value = false
+        return
+      }
       await authStore.register(email.value, password.value, username.value)
       await authStore.login(email.value, password.value)
+      success.value = '注册成功！验证邮件已发送到您的邮箱，请查收。'
+      const redirect = route.query.redirect as string
+      router.push(redirect || '/')
     }
-
-    const redirect = route.query.redirect as string
-    router.push(redirect || '/')
   } catch (err: any) {
     error.value = err.response?.data?.message || '操作失败，请重试'
   } finally {
@@ -65,6 +74,10 @@ async function handleSubmit() {
           <div v-if="error" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
             {{ error }}
           </div>
+          
+          <div v-if="success" class="rounded-md bg-green-500/10 p-3 text-sm text-green-600">
+            {{ success }}
+          </div>
 
           <div class="space-y-2">
             <Label for="email">邮箱</Label>
@@ -83,7 +96,7 @@ async function handleSubmit() {
               id="username"
               v-model="username"
               type="text"
-              placeholder="请输入用户名"
+              placeholder="请输入用户名（至少2个字符）"
               required
             />
           </div>
@@ -94,7 +107,7 @@ async function handleSubmit() {
               id="password"
               v-model="password"
               type="password"
-              placeholder="请输入密码"
+              placeholder="请输入密码（至少6个字符）"
               required
             />
           </div>
