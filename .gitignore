@@ -14,7 +14,7 @@ build/
 # IDE
 .idea/
 .vscode/
-.trae
+.trae/
 *.swp
 *.swo
 *~
@@ -57,6 +57,14 @@ temp/
 *.test
 *.out
 go.work
+go.work.sum
 
 # Vue
 .vite/
+
+# Docker
+docker-compose.override.yml
+
+# Release
+*.tar.gz
+release/
