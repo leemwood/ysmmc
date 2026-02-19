@@ -82,7 +82,8 @@ func (h *ModelHandler) Create(c *gin.Context) {
 
 	model, err := h.modelService.Create(userID, &req)
 	if err != nil {
-		response.InternalError(c, "failed to create model")
+		c.Error(err)
+		response.InternalError(c, "failed to create model: "+err.Error())
 		return
 	}
 

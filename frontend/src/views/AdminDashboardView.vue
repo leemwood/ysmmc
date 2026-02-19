@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { adminApi } from '@/lib/api'
-import type { Model, User, PaginatedResponse } from '@/types'
+import { adminApi, announcementApi } from '@/lib/api'
+import type { Model, User, Announcement, PaginatedResponse } from '@/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { LayoutDashboard, Package, Users, Download, Check, X, Loader2, FileText } from 'lucide-vue-next'
+import { LayoutDashboard, Package, Users, Download, Check, X, Loader2, FileText, Megaphone, Plus, Pencil, Trash2 } from 'lucide-vue-next'
 
 const activeTab = ref('overview')
 const loading = ref(true)
@@ -27,12 +28,20 @@ const stats = ref({
   total_downloads: 0,
 })
 const pendingModels = ref<Model[]>([])
+const pendingUpdates = ref<Model[]>([])
 const pendingProfiles = ref<User[]>([])
+const announcements = ref<Announcement[]>([])
 
 const rejectDialog = ref(false)
 const rejectModelId = ref('')
 const rejectReason = ref('')
 const rejecting = ref(false)
+
+const announcementDialog = ref(false)
+const editingAnnouncement = ref<Announcement | null>(null)
+const announcementTitle = ref('')
+const announcementContent = ref('')
+const savingAnnouncement = ref(false)
 
 const successMessage = ref('')
 const errorMessage = ref('')
@@ -65,6 +74,15 @@ async function fetchPendingModels() {
   }
 }
 
+async function fetchPendingUpdates() {
+  try {
+    const response = await adminApi.listPendingUpdates(1, 20)
+    pendingUpdates.value = (response.data.data as PaginatedResponse<Model>).items
+  } catch (error) {
+    console.error('Failed to fetch pending updates:', error)
+  }
+}
+
 async function fetchPendingProfiles() {
   try {
     const response = await adminApi.listPendingProfiles(1, 20)
@@ -74,11 +92,26 @@ async function fetchPendingProfiles() {
   }
 }
 
+async function fetchAnnouncements() {
+  try {
+    const response = await announcementApi.listAll()
+    const data = response.data.data
+    if (Array.isArray(data)) {
+      announcements.value = data
+    } else {
+      announcements.value = (data as PaginatedResponse<Announcement>).items
+    }
+  } catch (error) {
+    console.error('Failed to fetch announcements:', error)
+  }
+}
+
 async function approveModel(id: string) {
   try {
     await adminApi.approveModel(id)
-    showSuccess('模型已通过审核')
+    showSuccess('已通过审核')
     fetchPendingModels()
+    fetchPendingUpdates()
     fetchStats()
   } catch (error: any) {
     showError(error.response?.data?.message || '操作失败')
@@ -100,9 +133,10 @@ async function rejectModel() {
   rejecting.value = true
   try {
     await adminApi.rejectModel(rejectModelId.value, rejectReason.value)
-    showSuccess('模型已拒绝')
+    showSuccess('已拒绝')
     rejectDialog.value = false
     fetchPendingModels()
+    fetchPendingUpdates()
     fetchStats()
   } catch (error: any) {
     showError(error.response?.data?.message || '操作失败')
@@ -131,8 +165,75 @@ async function rejectProfile(id: string) {
   }
 }
 
+function openAnnouncementDialog(announcement?: Announcement) {
+  if (announcement) {
+    editingAnnouncement.value = announcement
+    announcementTitle.value = announcement.title
+    announcementContent.value = announcement.content
+  } else {
+    editingAnnouncement.value = null
+    announcementTitle.value = ''
+    announcementContent.value = ''
+  }
+  announcementDialog.value = true
+}
+
+async function saveAnnouncement() {
+  if (!announcementTitle.value.trim() || !announcementContent.value.trim()) {
+    showError('请填写标题和内容')
+    return
+  }
+  
+  savingAnnouncement.value = true
+  try {
+    if (editingAnnouncement.value) {
+      await adminApi.updateAnnouncement(editingAnnouncement.value.id, {
+        title: announcementTitle.value,
+        content: announcementContent.value
+      })
+      showSuccess('公告已更新')
+    } else {
+      await adminApi.createAnnouncement({
+        title: announcementTitle.value,
+        content: announcementContent.value
+      })
+      showSuccess('公告已创建')
+    }
+    announcementDialog.value = false
+    fetchAnnouncements()
+  } catch (error: any) {
+    showError(error.response?.data?.message || '操作失败')
+  } finally {
+    savingAnnouncement.value = false
+  }
+}
+
+async function deleteAnnouncement(id: string) {
+  if (!confirm('确定要删除此公告吗？')) return
+  
+  try {
+    await adminApi.deleteAnnouncement(id)
+    showSuccess('公告已删除')
+    fetchAnnouncements()
+  } catch (error: any) {
+    showError(error.response?.data?.message || '操作失败')
+  }
+}
+
+async function toggleAnnouncementActive(announcement: Announcement) {
+  try {
+    await adminApi.updateAnnouncement(announcement.id, {
+      is_active: !announcement.is_active
+    })
+    showSuccess(announcement.is_active ? '公告已停用' : '公告已启用')
+    fetchAnnouncements()
+  } catch (error: any) {
+    showError(error.response?.data?.message || '操作失败')
+  }
+}
+
 onMounted(async () => {
-  await Promise.all([fetchStats(), fetchPendingModels(), fetchPendingProfiles()])
+  await Promise.all([fetchStats(), fetchPendingModels(), fetchPendingUpdates(), fetchPendingProfiles(), fetchAnnouncements()])
   loading.value = false
 })
 </script>
@@ -168,6 +269,15 @@ onMounted(async () => {
       </button>
       <button
         class="flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+        :class="activeTab === 'updates' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
+        @click="activeTab = 'updates'"
+      >
+        <FileText class="h-4 w-4" />
+        更新审核
+        <Badge v-if="pendingUpdates.length > 0" variant="destructive" class="ml-1">{{ pendingUpdates.length }}</Badge>
+      </button>
+      <button
+        class="flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors"
         :class="activeTab === 'profiles' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
         @click="activeTab = 'profiles'"
       >
@@ -182,6 +292,14 @@ onMounted(async () => {
         <Users class="h-4 w-4" />
         用户管理
       </RouterLink>
+      <button
+        class="flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+        :class="activeTab === 'announcements' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
+        @click="activeTab = 'announcements'"
+      >
+        <Megaphone class="h-4 w-4" />
+        公告管理
+      </button>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
@@ -278,6 +396,51 @@ onMounted(async () => {
         </div>
       </div>
 
+      <div v-else-if="activeTab === 'updates'">
+        <div v-if="pendingUpdates.length === 0" class="text-center py-12 text-muted-foreground">
+          暂无待审核更新
+        </div>
+
+        <div v-else class="space-y-4">
+          <Card v-for="model in pendingUpdates" :key="model.id">
+            <CardContent class="p-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                  <div class="h-16 w-16 flex-shrink-0 rounded bg-muted">
+                    <img v-if="model.pending_changes?.image_url" :src="model.pending_changes.image_url" class="h-full w-full object-cover rounded" />
+                    <img v-else-if="model.image_url" :src="model.image_url" class="h-full w-full object-cover rounded" />
+                  </div>
+                  <div>
+                    <RouterLink :to="`/model/${model.id}`" class="font-medium hover:underline">
+                      {{ model.title }}
+                    </RouterLink>
+                    <p class="text-sm text-muted-foreground">
+                      新标题: {{ model.pending_changes?.title || '无变更' }}
+                    </p>
+                    <p class="text-sm text-muted-foreground">
+                      新描述: {{ model.pending_changes?.description || '无变更' }}
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                      上传者: {{ model.user?.username }}
+                    </p>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <Button size="sm" variant="default" @click="approveModel(model.id)">
+                    <Check class="mr-1 h-4 w-4" />
+                    通过
+                  </Button>
+                  <Button size="sm" variant="destructive" @click="openRejectDialog(model.id)">
+                    <X class="mr-1 h-4 w-4" />
+                    拒绝
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
       <div v-else-if="activeTab === 'profiles'">
         <div v-if="pendingProfiles.length === 0" class="text-center py-12 text-muted-foreground">
           暂无待审核资料
@@ -316,6 +479,49 @@ onMounted(async () => {
           </Card>
         </div>
       </div>
+
+      <div v-else-if="activeTab === 'announcements'">
+        <div class="mb-4 flex justify-end">
+          <Button @click="openAnnouncementDialog()">
+            <Plus class="mr-2 h-4 w-4" />
+            新建公告
+          </Button>
+        </div>
+
+        <div v-if="announcements.length === 0" class="text-center py-12 text-muted-foreground">
+          暂无公告
+        </div>
+
+        <div v-else class="space-y-4">
+          <Card v-for="announcement in announcements" :key="announcement.id">
+            <CardContent class="p-4">
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <p class="font-medium">{{ announcement.title }}</p>
+                    <Badge v-if="!announcement.is_active" variant="outline" class="text-muted-foreground">已停用</Badge>
+                  </div>
+                  <p class="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{{ announcement.content }}</p>
+                  <p class="text-xs text-muted-foreground mt-2">
+                    创建于: {{ new Date(announcement.created_at).toLocaleString() }}
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  <Button size="sm" variant="outline" @click="toggleAnnouncementActive(announcement)">
+                    {{ announcement.is_active ? '停用' : '启用' }}
+                  </Button>
+                  <Button size="sm" variant="outline" @click="openAnnouncementDialog(announcement)">
+                    <Pencil class="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="destructive" @click="deleteAnnouncement(announcement.id)">
+                    <Trash2 class="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </template>
 
     <Dialog v-model:open="rejectDialog">
@@ -339,6 +545,38 @@ onMounted(async () => {
           <Button variant="destructive" @click="rejectModel" :disabled="rejecting">
             <Loader2 v-if="rejecting" class="mr-2 h-4 w-4 animate-spin" />
             确认拒绝
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="announcementDialog">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{{ editingAnnouncement ? '编辑公告' : '新建公告' }}</DialogTitle>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label>标题</Label>
+            <Input 
+              v-model="announcementTitle" 
+              placeholder="请输入公告标题"
+            />
+          </div>
+          <div class="space-y-2">
+            <Label>内容</Label>
+            <Textarea 
+              v-model="announcementContent" 
+              placeholder="请输入公告内容..."
+              :rows="5"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="announcementDialog = false">取消</Button>
+          <Button @click="saveAnnouncement" :disabled="savingAnnouncement">
+            <Loader2 v-if="savingAnnouncement" class="mr-2 h-4 w-4 animate-spin" />
+            保存
           </Button>
         </DialogFooter>
       </DialogContent>

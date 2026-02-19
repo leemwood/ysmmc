@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { adminApi } from '@/lib/api'
+import { adminApi, userApi } from '@/lib/api'
 import type { User, PaginatedResponse } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -40,6 +40,10 @@ const banDialog = ref(false)
 const banUserId = ref<string>('')
 const banReason = ref('')
 const banning = ref(false)
+
+const deleteDialog = ref(false)
+const deleteUserId = ref<string>('')
+const deleting = ref(false)
 
 const isSuperAdmin = computed(() => authStore.user?.role === 'super_admin')
 
@@ -107,6 +111,24 @@ async function unbanUser(userId: string) {
     await fetchUsers()
   } catch (error: any) {
     alert(error.response?.data?.message || '操作失败')
+  }
+}
+
+function openDeleteDialog(userId: string) {
+  deleteUserId.value = userId
+  deleteDialog.value = true
+}
+
+async function deleteUser() {
+  deleting.value = true
+  try {
+    await userApi.delete(deleteUserId.value)
+    deleteDialog.value = false
+    await fetchUsers()
+  } catch (error: any) {
+    alert(error.response?.data?.message || '操作失败')
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -253,14 +275,22 @@ onMounted(fetchUsers)
                   </template>
                   
                   <template v-if="user.is_banned">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       @click="unbanUser(user.id)"
                     >
                       解封
                     </Button>
                   </template>
+
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    @click="openDeleteDialog(user.id)"
+                  >
+                    删除
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>
@@ -302,8 +332,8 @@ onMounted(fetchUsers)
         <div class="space-y-4">
           <div>
             <Label>封禁原因</Label>
-            <Textarea 
-              v-model="banReason" 
+            <Textarea
+              v-model="banReason"
               placeholder="请输入封禁原因..."
               :rows="3"
             />
@@ -314,6 +344,24 @@ onMounted(fetchUsers)
           <Button variant="destructive" @click="banUser" :disabled="banning">
             <Loader2 v-if="banning" class="h-4 w-4 mr-2 animate-spin" />
             确认封禁
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="deleteDialog">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>删除用户</DialogTitle>
+          <DialogDescription>
+            确定要删除该用户吗？此操作不可逆，用户的所有数据将被删除。
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" @click="deleteDialog = false">取消</Button>
+          <Button variant="destructive" @click="deleteUser" :disabled="deleting">
+            <Loader2 v-if="deleting" class="h-4 w-4 mr-2 animate-spin" />
+            确认删除
           </Button>
         </DialogFooter>
       </DialogContent>

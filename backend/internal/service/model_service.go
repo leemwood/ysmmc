@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/repository"
 )
@@ -48,7 +49,7 @@ func (s *ModelService) Create(userID uuid.UUID, req *CreateModelRequest) (*model
 		FilePath:    req.FilePath,
 		FileSize:    req.FileSize,
 		ImageURL:    req.ImageURL,
-		Tags:        req.Tags,
+		Tags:        pq.StringArray(req.Tags),
 		IsPublic:    req.IsPublic,
 		Status:      "pending",
 	}
@@ -91,7 +92,7 @@ func (s *ModelService) Update(modelID, userID uuid.UUID, req *UpdateModelRequest
 			m.ImageURL = req.ImageURL
 		}
 		if req.Tags != nil {
-			m.Tags = req.Tags
+			m.Tags = pq.StringArray(req.Tags)
 		}
 		if req.IsPublic != nil {
 			m.IsPublic = *req.IsPublic
@@ -160,7 +161,7 @@ func (s *ModelService) Approve(modelID uuid.UUID) error {
 			m.ImageURL = m.PendingChanges.ImageURL
 		}
 		if m.PendingChanges.Tags != nil {
-			m.Tags = m.PendingChanges.Tags
+			m.Tags = pq.StringArray(m.PendingChanges.Tags)
 		}
 		if m.PendingChanges.IsPublic != nil {
 			m.IsPublic = *m.PendingChanges.IsPublic

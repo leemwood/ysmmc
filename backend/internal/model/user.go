@@ -1,6 +1,8 @@
 package model
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,6 +36,24 @@ type PendingChanges struct {
 	Username  *string `json:"username,omitempty"`
 	Bio       *string `json:"bio,omitempty"`
 	AvatarURL *string `json:"avatar_url,omitempty"`
+}
+
+func (p *PendingChanges) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		return nil
+	}
+	return json.Unmarshal(bytes, p)
+}
+
+func (p PendingChanges) Value() (driver.Value, error) {
+	if p.Username == nil && p.Bio == nil && p.AvatarURL == nil {
+		return nil, nil
+	}
+	return json.Marshal(p)
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {

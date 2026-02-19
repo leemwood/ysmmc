@@ -79,6 +79,16 @@ export const userApi = {
     api.get<ApiResponse<PaginatedResponse<Model>>>(`/users/${id}/models`, {
       params: { page, page_size: pageSize },
     }),
+
+  list: (page = 1, pageSize = 20) =>
+    api.get<ApiResponse<PaginatedResponse<User>>>('/users', {
+      params: { page, page_size: pageSize },
+    }),
+
+  updateRole: (id: string, role: string) =>
+    api.put<ApiResponse<null>>(`/users/${id}/role`, { role }),
+
+  delete: (id: string) => api.delete<ApiResponse<null>>(`/users/${id}`),
 }
 
 export const modelApi = {

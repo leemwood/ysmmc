@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 vendor/
+desktop-*/
 
 # Build outputs
 dist/

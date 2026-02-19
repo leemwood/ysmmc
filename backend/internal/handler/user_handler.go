@@ -40,7 +40,8 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.UpdateProfile(userID, &req, role == "admin")
+	isAdmin := role == "admin" || role == "super_admin"
+	user, err := h.userService.UpdateProfile(userID, &req, isAdmin)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
