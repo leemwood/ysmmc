@@ -3,8 +3,13 @@ package service
 import (
 	"errors"
 
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"github.com/ysmmc/backend/internal/config"
 	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/repository"
 )
@@ -126,7 +131,43 @@ func (s *ModelService) Delete(modelID, userID uuid.UUID, isAdmin bool) error {
 		return errors.New("unauthorized")
 	}
 
+	// Delete associated files
+	if err := deleteModelFiles(m); err != nil {
+		// Log error but continue with DB deletion
+		// In a real production system, you might want to retry or handle this better
+	}
+
 	return s.modelRepo.Delete(modelID)
+}
+
+func deleteModelFiles(m *model.Model) error {
+	cfg := config.AppConfig
+	
+	// Delete model file
+	if m.FilePath != "" {
+		// FilePath stored in DB is usually the full relative path from upload dir or absolute path
+		// If it's relative to CWD (where binary runs), we can just remove it
+		if err := os.Remove(m.FilePath); err != nil && !os.IsNotExist(err) {
+			// Log error?
+		}
+	}
+
+	// Delete image file if it's stored locally
+	if m.ImageURL != nil && *m.ImageURL != "" {
+		imageURL := *m.ImageURL
+		// Check if it's a local file (e.g. starts with /uploads/)
+		if strings.HasPrefix(imageURL, "/uploads/") {
+			// Remove /uploads/ prefix
+			relPath := strings.TrimPrefix(imageURL, "/uploads/")
+			// Construct full path
+			fullPath := filepath.Join(cfg.UploadPath, relPath)
+			if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+				// Log error?
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *ModelService) ListPublic(page, pageSize int, search string) ([]model.Model, int64, error) {

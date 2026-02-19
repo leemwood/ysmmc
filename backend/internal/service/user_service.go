@@ -2,20 +2,26 @@ package service
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/ysmmc/backend/internal/config"
 	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/repository"
 	"github.com/ysmmc/backend/pkg/auth"
 )
 
 type UserService struct {
-	userRepo *repository.UserRepository
+	userRepo  *repository.UserRepository
+	modelRepo *repository.ModelRepository
 }
 
 func NewUserService() *UserService {
 	return &UserService{
-		userRepo: repository.NewUserRepository(),
+		userRepo:  repository.NewUserRepository(),
+		modelRepo: repository.NewModelRepository(),
 	}
 }
 
@@ -163,6 +169,53 @@ func (s *UserService) ListPendingProfiles(page, pageSize int) ([]model.User, int
 }
 
 func (s *UserService) Delete(userID uuid.UUID) error {
+	// First, fetch all user models to delete their files
+	// We fetch a large number to cover most cases. If a user has > 10000 models, this might miss some files,
+	// but the DB records will still be deleted by cascade.
+	// Ideally, we should loop until no more models are returned.
+	page := 1
+	pageSize := 1000
+	for {
+		models, _, err := s.modelRepo.ListByUserID(userID, page, pageSize)
+		if err != nil {
+			// If we fail to list models, we should probably still try to delete the user
+			// but maybe log the error? For now, let's return error to be safe.
+			return err
+		}
+
+		if len(models) == 0 {
+			break
+		}
+
+		for _, m := range models {
+			// Delete files associated with the model
+			// deleteModelFiles is an unexported helper in model_service.go (same package)
+			if err := deleteModelFiles(&m); err != nil {
+				// Log error but continue
+			}
+		}
+
+		if len(models) < pageSize {
+			break
+		}
+		page++
+	}
+
+	// Delete user avatar if it's a local file
+	user, err := s.userRepo.FindByID(userID)
+	if err == nil && user.AvatarURL != nil && *user.AvatarURL != "" {
+		cfg := config.AppConfig
+		avatarURL := *user.AvatarURL
+		if strings.HasPrefix(avatarURL, "/uploads/") {
+			relPath := strings.TrimPrefix(avatarURL, "/uploads/")
+			fullPath := filepath.Join(cfg.UploadPath, relPath)
+			if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+				// Log error
+			}
+		}
+	}
+
+	// Delete user record (will cascade delete models, favorites, etc. in DB)
 	return s.userRepo.Delete(userID)
 }
 

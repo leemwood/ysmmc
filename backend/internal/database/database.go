@@ -39,10 +39,6 @@ func Migrate() error {
 		log.Printf("Warning: failed to migrate super admin role: %v", err)
 	}
 
-	if err := addMissingColumns(); err != nil {
-		log.Printf("Warning: failed to add missing columns: %v", err)
-	}
-
 	err := DB.AutoMigrate(
 		&model.User{},
 		&model.Model{},
@@ -55,22 +51,6 @@ func Migrate() error {
 	}
 
 	log.Println("Database migrated successfully")
-	return nil
-}
-
-func addMissingColumns() error {
-	columns := []string{
-		"new_email VARCHAR(255)",
-		"email_change_token VARCHAR(255)",
-		"is_banned BOOLEAN DEFAULT FALSE",
-		"banned_at TIMESTAMP",
-		"banned_reason TEXT",
-	}
-	for _, col := range columns {
-		if err := DB.Exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS " + col).Error; err != nil {
-			log.Printf("Warning: failed to add column: %v", err)
-		}
-	}
 	return nil
 }
 
