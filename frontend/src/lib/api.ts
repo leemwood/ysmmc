@@ -4,7 +4,7 @@ import type { ApiResponse, LoginResponse, User, Model, PaginatedResponse, Announ
 const isDev = import.meta.env.DEV
 
 const api: AxiosInstance = axios.create({
-  baseURL: isDev ? '/api' : 'http://api.ysmmc.cn/api',
+  baseURL: isDev ? '/api' : 'https://api.ysmmc.cn/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
