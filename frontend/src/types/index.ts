@@ -1,87 +1,47 @@
-export interface User {
-  id: string
-  email: string
-  username: string
-  avatar_url: string | null
-  bio: string | null
-  role: 'user' | 'admin' | 'super_admin'
-  profile_status: 'approved' | 'pending_review'
-  pending_changes: PendingChanges | null
-  email_verified: boolean
-  is_banned: boolean
-  banned_at: string | null
-  banned_reason: string | null
-  created_at: string
-}
-
-export interface PendingChanges {
-  username?: string
-  bio?: string
-  avatar_url?: string
-}
-
-export interface Model {
-  id: string
-  user_id: string
-  title: string
-  description: string | null
-  file_path: string
-  file_size: number
-  image_url: string | null
-  tags: string[]
-  is_public: boolean
-  status: 'pending' | 'approved' | 'rejected'
-  update_status: 'idle' | 'pending_review'
-  pending_changes: ModelPendingChanges | null
-  downloads: number
-  rejection_reason: string | null
-  created_at: string
-  updated_at: string
-  user?: User
-}
-
-export interface ModelPendingChanges {
-  title?: string
-  description?: string
-  tags?: string[]
-  file_path?: string
-  image_url?: string
-  is_public?: boolean
-}
-
-export interface Favorite {
-  id: string
-  user_id: string
-  model_id: string
-  created_at: string
-  model?: Model
-}
-
-export interface Announcement {
-  id: string
-  title: string
-  content: string
-  is_active: boolean
-  created_at: string
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
 }
 
 export interface PaginatedResponse<T> {
-  items: T[]
-  total: number
-  page: number
-  page_size: number
-  total_pages: number
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }
 
-export interface ApiResponse<T> {
-  code: number
-  message: string
-  data?: T
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  avatar_url?: string;
+  bio?: string;
+  role: string;
+  created_at: string;
 }
 
-export interface LoginResponse {
-  access_token: string
-  refresh_token: string
-  expires_in: number
-  user: User
+export interface Model {
+  id: string;
+  title: string;
+  description?: string;
+  file_path: string;
+  file_size: number;
+  image_url?: string;
+  tags: string[];
+  downloads: number;
+  is_public: boolean;
+  status: string;
+  user_id: string;
+  user?: User;
+  created_at: string;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  is_active: boolean;
+  created_at: string;
 }
