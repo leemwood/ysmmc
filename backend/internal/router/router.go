@@ -22,10 +22,11 @@ func Setup(r *gin.Engine) {
 	{
 		auth := api.Group("/auth")
 		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
+			auth.POST("/register", middleware.RegisterRateLimit(), authHandler.Register)
+			auth.POST("/login", middleware.LoginRateLimit(), authHandler.Login)
+			auth.POST("/logout", middleware.Auth(), authHandler.Logout)
 			auth.POST("/refresh", authHandler.RefreshToken)
-			auth.POST("/forgot-password", authHandler.ForgotPassword)
+			auth.POST("/forgot-password", middleware.ForgotPasswordRateLimit(), authHandler.ForgotPassword)
 			auth.POST("/reset-password", authHandler.ResetPassword)
 			auth.GET("/verify", authHandler.VerifyEmail)
 			auth.POST("/change-email", middleware.Auth(), authHandler.ChangeEmail)
@@ -100,7 +101,11 @@ func Setup(r *gin.Engine) {
 		}
 	}
 
-	r.Static("/uploads", "../uploads")
+	uploads := api.Group("/uploads")
+	{
+		uploads.GET("/images/*filename", uploadHandler.ServeImage)
+		uploads.GET("/models/*filename", uploadHandler.ServeModelFile)
+	}
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})

@@ -120,12 +120,43 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
+	currentRole := middleware.GetRole(c)
+	targetUser, err := h.userService.GetByID(id)
+	if err != nil {
+		response.NotFound(c, "user not found")
+		return
+	}
+
+	if !isValidRole(req.Role) {
+		response.BadRequest(c, "invalid role, must be 'user' or 'admin'")
+		return
+	}
+
+	if model.IsSuperAdmin(targetUser.Role) {
+		response.BadRequest(c, "cannot modify super admin role")
+		return
+	}
+
+	if req.Role == "super_admin" {
+		response.BadRequest(c, "cannot assign super_admin role through this endpoint")
+		return
+	}
+
+	if req.Role == "admin" && !model.IsSuperAdmin(currentRole) {
+		response.Forbidden(c, "only super admin can assign admin role")
+		return
+	}
+
 	if err := h.userService.UpdateRole(id, req.Role); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
 	response.SuccessWithMessage(c, "role updated successfully", nil)
+}
+
+func isValidRole(role string) bool {
+	return role == "user" || role == "admin"
 }
 
 func (h *AdminHandler) ListPendingProfiles(c *gin.Context) {

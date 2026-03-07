@@ -7,11 +7,16 @@ import (
 	"github.com/ysmmc/backend/internal/config"
 	"github.com/ysmmc/backend/internal/database"
 	"github.com/ysmmc/backend/internal/router"
+	"github.com/ysmmc/backend/internal/service"
 )
 
 func main() {
 	if err := config.LoadConfig(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	if err := config.Validate(); err != nil {
+		log.Fatalf("Config validation failed: %v", err)
 	}
 
 	if err := database.Connect(); err != nil {
@@ -24,6 +29,11 @@ func main() {
 
 	if err := database.Seed(); err != nil {
 		log.Fatalf("Failed to seed database: %v", err)
+	}
+
+	storageService := service.NewStorageService()
+	if err := storageService.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize storage: %v", err)
 	}
 
 	gin.SetMode(config.AppConfig.GinMode)

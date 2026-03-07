@@ -99,6 +99,7 @@ func (s *UserService) ChangePassword(userID uuid.UUID, req *ChangePasswordReques
 	}
 
 	user.PasswordHash = passwordHash
+	user.MustChangePassword = false
 	return s.userRepo.Update(user)
 }
 

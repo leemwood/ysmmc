@@ -25,6 +25,8 @@ type User struct {
 	ResetExpires      *time.Time      `json:"-" gorm:"column:reset_token_expires"`
 	NewEmail          *string         `json:"-" gorm:"size:255"`
 	EmailChangeToken  *string         `json:"-" gorm:"size:255"`
+	EmailChangeExpires *time.Time     `json:"-" gorm:"column:email_change_token_expires"`
+	MustChangePassword bool           `json:"must_change_password" gorm:"default:false"`
 	IsBanned          bool            `json:"is_banned" gorm:"default:false"`
 	BannedAt          *time.Time      `json:"banned_at"`
 	BannedReason      *string         `json:"banned_reason" gorm:"type:text"`

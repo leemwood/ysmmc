@@ -82,8 +82,7 @@ func (h *ModelHandler) Create(c *gin.Context) {
 
 	model, err := h.modelService.Create(userID, &req)
 	if err != nil {
-		c.Error(err)
-		response.InternalError(c, "failed to create model: "+err.Error())
+		response.InternalError(c, "failed to create model")
 		return
 	}
 
@@ -146,11 +145,16 @@ func (h *ModelHandler) Download(c *gin.Context) {
 		return
 	}
 
+	if model.Status != "approved" {
+		response.Forbidden(c, "model is not available for download")
+		return
+	}
+
 	h.modelService.IncrementDownloads(id)
 
 	response.Success(c, gin.H{
-		"file_path": model.FilePath,
-		"file_name": model.Title,
+		"download_url": "/api/models/" + id.String() + "/file",
+		"file_name":    model.Title,
 	})
 }
 

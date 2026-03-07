@@ -63,6 +63,10 @@ func InternalError(c *gin.Context, message string) {
 	Error(c, http.StatusInternalServerError, 500, message)
 }
 
+func TooManyRequests(c *gin.Context, message string) {
+	Error(c, http.StatusTooManyRequests, 429, message)
+}
+
 func Paginated(c *gin.Context, items interface{}, total int64, page, pageSize int) {
 	totalPages := int(total) / pageSize
 	if int(total)%pageSize > 0 {

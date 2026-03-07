@@ -1,6 +1,8 @@
 package database
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -74,24 +76,33 @@ func Seed() error {
 		return nil
 	}
 
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+	randomPassword := generateRandomPassword(16)
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(randomPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
 	superAdmin := model.User{
-		ID:            uuid.New(),
-		Email:         "admin@ysmmc.local",
-		PasswordHash:  string(passwordHash),
-		Username:      "admin",
-		Role:          "super_admin",
-		ProfileStatus: "approved",
-		EmailVerified: true,
+		ID:                uuid.New(),
+		Email:             "admin@ysmmc.local",
+		PasswordHash:      string(passwordHash),
+		Username:          "admin",
+		Role:              "super_admin",
+		ProfileStatus:     "approved",
+		EmailVerified:     true,
+		MustChangePassword: true,
 	}
 
 	if err := DB.Create(&superAdmin).Error; err != nil {
 		return fmt.Errorf("failed to create super admin user: %w", err)
 	}
+
+	log.Println("==========================================")
+	log.Println("SUPER ADMIN CREDENTIALS (SAVE THIS!)")
+	log.Printf("Email: %s", superAdmin.Email)
+	log.Printf("Password: %s", randomPassword)
+	log.Println("Please change the password after first login!")
+	log.Println("==========================================")
 
 	announcement := model.Announcement{
 		ID:       uuid.New(),
@@ -106,4 +117,13 @@ func Seed() error {
 
 	log.Println("Database seeded successfully (super_admin created)")
 	return nil
+}
+
+func generateRandomPassword(length int) string {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		log.Printf("Warning: failed to generate random password, using fallback: %v", err)
+		return "Ch@ng3Th1sP@ssw0rd!"
+	}
+	return hex.EncodeToString(bytes)[:length]
 }

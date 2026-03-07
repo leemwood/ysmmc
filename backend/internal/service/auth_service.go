@@ -11,16 +11,19 @@ import (
 	"github.com/ysmmc/backend/internal/repository"
 	"github.com/ysmmc/backend/pkg/auth"
 	"github.com/ysmmc/backend/pkg/email"
+	"github.com/ysmmc/backend/pkg/utils"
 )
 
 type AuthService struct {
 	userRepo     *repository.UserRepository
+	sessionRepo  *repository.SessionRepository
 	emailService *email.EmailService
 }
 
 func NewAuthService() *AuthService {
 	return &AuthService{
 		userRepo:     repository.NewUserRepository(),
+		sessionRepo:  repository.NewSessionRepository(),
 		emailService: email.NewEmailService(),
 	}
 }
@@ -37,10 +40,11 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	AccessToken  string      `json:"access_token"`
-	RefreshToken string      `json:"refresh_token"`
-	ExpiresIn    int64       `json:"expires_in"`
-	User         *model.User `json:"user"`
+	AccessToken        string      `json:"access_token"`
+	RefreshToken       string      `json:"refresh_token"`
+	ExpiresIn          int64       `json:"expires_in"`
+	User               *model.User `json:"user"`
+	MustChangePassword bool        `json:"must_change_password"`
 }
 
 type ChangeEmailRequest struct {
@@ -48,6 +52,21 @@ type ChangeEmailRequest struct {
 }
 
 func (s *AuthService) Register(req *RegisterRequest) (*model.User, error) {
+	req.Email = utils.SanitizeString(req.Email)
+	req.Username = utils.SanitizeString(req.Username)
+
+	if !utils.ValidateEmail(req.Email) {
+		return nil, errors.New("invalid email format")
+	}
+
+	if !utils.ValidateUsername(req.Username) {
+		return nil, errors.New("username can only contain letters, numbers, underscores, hyphens, and Chinese characters")
+	}
+
+	if !utils.ValidatePassword(req.Password) {
+		return nil, errors.New("password must be at least 6 characters")
+	}
+
 	if s.userRepo.ExistsByEmail(req.Email) {
 		return nil, errors.New("email already registered")
 	}
@@ -114,21 +133,36 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 		return nil, err
 	}
 
+	expiresAt := time.Now().Add(time.Duration(config.AppConfig.JWTRefreshExpireDays) * 24 * time.Hour)
+	session := &model.Session{
+		UserID:    user.ID,
+		TokenHash: repository.HashToken(tokens.RefreshToken),
+		ExpiresAt: expiresAt,
+	}
+	s.sessionRepo.Create(session)
+
 	return &LoginResponse{
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
-		ExpiresIn:    tokens.ExpiresIn,
-		User:         user,
+		AccessToken:        tokens.AccessToken,
+		RefreshToken:       tokens.RefreshToken,
+		ExpiresIn:          tokens.ExpiresIn,
+		User:               user,
+		MustChangePassword: user.MustChangePassword,
 	}, nil
 }
 
 func (s *AuthService) RefreshToken(refreshToken string) (*auth.TokenPair, error) {
-	userID, err := auth.ParseRefreshToken(refreshToken)
+	tokenHash := repository.HashToken(refreshToken)
+	session, err := s.sessionRepo.FindByTokenHash(tokenHash)
 	if err != nil {
 		return nil, errors.New("invalid refresh token")
 	}
 
-	user, err := s.userRepo.FindByID(userID)
+	if session.ExpiresAt.Before(time.Now()) {
+		s.sessionRepo.DeleteByTokenHash(tokenHash)
+		return nil, errors.New("refresh token has expired")
+	}
+
+	user, err := s.userRepo.FindByID(session.UserID)
 	if err != nil {
 		return nil, errors.New("user not found")
 	}
@@ -137,7 +171,27 @@ func (s *AuthService) RefreshToken(refreshToken string) (*auth.TokenPair, error)
 		return nil, errors.New("your account has been banned")
 	}
 
-	return auth.GenerateToken(user.ID, user.Email, user.Role)
+	s.sessionRepo.DeleteByTokenHash(tokenHash)
+
+	tokens, err := auth.GenerateToken(user.ID, user.Email, user.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	expiresAt := time.Now().Add(time.Duration(config.AppConfig.JWTRefreshExpireDays) * 24 * time.Hour)
+	newSession := &model.Session{
+		UserID:    user.ID,
+		TokenHash: repository.HashToken(tokens.RefreshToken),
+		ExpiresAt: expiresAt,
+	}
+	s.sessionRepo.Create(newSession)
+
+	return tokens, nil
+}
+
+func (s *AuthService) Logout(refreshToken string) error {
+	tokenHash := repository.HashToken(refreshToken)
+	return s.sessionRepo.DeleteByTokenHash(tokenHash)
 }
 
 func (s *AuthService) ForgotPassword(emailAddr string) error {
@@ -213,8 +267,10 @@ func (s *AuthService) ChangeEmail(userID uuid.UUID, newEmail string) error {
 	}
 
 	changeToken := uuid.New().String()
+	expires := time.Now().Add(1 * time.Hour)
 	user.NewEmail = &newEmail
 	user.EmailChangeToken = &changeToken
+	user.EmailChangeExpires = &expires
 
 	if err := s.userRepo.Update(user); err != nil {
 		return err
@@ -239,9 +295,18 @@ func (s *AuthService) VerifyEmailChange(token string) error {
 		return errors.New("no pending email change")
 	}
 
+	if user.EmailChangeExpires == nil || user.EmailChangeExpires.Before(time.Now()) {
+		user.NewEmail = nil
+		user.EmailChangeToken = nil
+		user.EmailChangeExpires = nil
+		s.userRepo.Update(user)
+		return errors.New("email change token has expired")
+	}
+
 	user.Email = *user.NewEmail
 	user.NewEmail = nil
 	user.EmailChangeToken = nil
+	user.EmailChangeExpires = nil
 	user.EmailVerified = true
 
 	return s.userRepo.Update(user)

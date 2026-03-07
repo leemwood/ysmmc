@@ -1,23 +1,26 @@
 package handler
 
 import (
+	"bytes"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ysmmc/backend/internal/config"
-	"github.com/ysmmc/backend/internal/middleware"
+	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
+	"github.com/ysmmc/backend/pkg/utils"
 )
 
-type UploadHandler struct{}
+type UploadHandler struct {
+	storageService *service.StorageService
+}
 
 func NewUploadHandler() *UploadHandler {
-	return &UploadHandler{}
+	return &UploadHandler{
+		storageService: service.NewStorageService(),
+	}
 }
 
 func (h *UploadHandler) UploadModel(c *gin.Context) {
@@ -34,37 +37,45 @@ func (h *UploadHandler) UploadModel(c *gin.Context) {
 		return
 	}
 
-	ext := strings.ToLower(filepath.Ext(header.Filename))
+	ext := strings.ToLower(getExtension(header.Filename))
 	allowedExts := map[string]bool{".ysm": true, ".zip": true}
 	if !allowedExts[ext] {
 		response.BadRequest(c, "invalid file type, only .ysm and .zip are allowed")
 		return
 	}
 
+	if err := h.storageService.ValidateFilename(header.Filename); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	buf := new(bytes.Buffer)
+	tee := io.TeeReader(file, buf)
+
+	if err := utils.ValidateZipMagicNumber(tee); err != nil {
+		response.BadRequest(c, "invalid file content: file does not appear to be a valid archive")
+		return
+	}
+
+	if err := h.storageService.CheckDiskSpace(); err != nil {
+		response.BadRequest(c, "insufficient disk space")
+		return
+	}
+
 	filename := uuid.New().String() + ext
-	uploadPath := filepath.Join(cfg.UploadPath, "models", filename)
+	multiReader := io.MultiReader(buf, file)
 
-	if err := os.MkdirAll(filepath.Dir(uploadPath), 0755); err != nil {
-		response.InternalError(c, "failed to create upload directory")
-		return
-	}
-
-	dst, err := os.Create(uploadPath)
+	savedPath, err := h.storageService.SaveFile("models", filename, multiReader)
 	if err != nil {
-		response.InternalError(c, "failed to create file")
-		return
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, file); err != nil {
 		response.InternalError(c, "failed to save file")
 		return
 	}
 
 	response.Success(c, gin.H{
-		"file_path": uploadPath,
-		"file_name": header.Filename,
-		"file_size": header.Size,
+		"file_path":  "/uploads/" + savedPath,
+		"file_name":  header.Filename,
+		"file_size":  header.Size,
+		"saved_path": savedPath,
 	})
 }
 
@@ -83,86 +94,62 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 		return
 	}
 
-	ext := strings.ToLower(filepath.Ext(header.Filename))
+	ext := strings.ToLower(getExtension(header.Filename))
 	allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}
 	if !allowedExts[ext] {
 		response.BadRequest(c, "invalid image type")
 		return
 	}
 
+	if err := h.storageService.ValidateFilename(header.Filename); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	buf := new(bytes.Buffer)
+	tee := io.TeeReader(file, buf)
+
+	if err := utils.ValidateImageMagicNumber(tee, ext); err != nil {
+		response.BadRequest(c, "invalid image content: file does not match the declared type")
+		return
+	}
+
+	if err := h.storageService.CheckDiskSpace(); err != nil {
+		response.BadRequest(c, "insufficient disk space")
+		return
+	}
+
 	filename := uuid.New().String() + ext
-	uploadPath := filepath.Join(cfg.UploadPath, "images", filename)
+	multiReader := io.MultiReader(buf, file)
 
-	if err := os.MkdirAll(filepath.Dir(uploadPath), 0755); err != nil {
-		response.InternalError(c, "failed to create upload directory")
-		return
-	}
-
-	dst, err := os.Create(uploadPath)
+	savedPath, err := h.storageService.SaveFile("images", filename, multiReader)
 	if err != nil {
-		response.InternalError(c, "failed to create file")
-		return
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, file); err != nil {
 		response.InternalError(c, "failed to save file")
 		return
 	}
 
 	response.Success(c, gin.H{
-		"file_path": uploadPath,
-		"file_name": header.Filename,
-		"url":       "/uploads/images/" + filename,
+		"file_name":  header.Filename,
+		"url":        "/uploads/" + savedPath,
+		"saved_path": savedPath,
 	})
 }
 
-func (h *UploadHandler) DownloadModel(c *gin.Context) {
-	modelID := c.Param("id")
-	if modelID == "" {
-		response.BadRequest(c, "invalid model id")
-		return
-	}
-
-	userID := middleware.GetUserID(c)
-	_ = userID
-
-	cfg := config.AppConfig
-	modelsDir := filepath.Join(cfg.UploadPath, "models")
-
-	files, err := os.ReadDir(modelsDir)
-	if err != nil {
-		response.InternalError(c, "failed to read models directory")
-		return
-	}
-
-	var targetFile string
-	for _, f := range files {
-		if strings.HasPrefix(f.Name(), modelID) {
-			targetFile = filepath.Join(modelsDir, f.Name())
-			break
-		}
-	}
-
-	if targetFile == "" {
-		response.NotFound(c, "model file not found")
-		return
-	}
-
-	c.FileAttachment(targetFile, filepath.Base(targetFile))
-}
-
 func (h *UploadHandler) ServeImage(c *gin.Context) {
-	filename := c.Param("filename")
+	filename := strings.TrimPrefix(c.Param("filename"), "/")
 	if filename == "" {
 		response.BadRequest(c, "invalid filename")
 		return
 	}
 
-	cfg := config.AppConfig
-	imagePath := filepath.Join(cfg.UploadPath, "images", filename)
+	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		response.BadRequest(c, "invalid filename")
+		return
+	}
 
-	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+	imagePath := h.storageService.GetFilePath("images", filename)
+
+	if !h.storageService.FileExists("images", filename) {
 		response.NotFound(c, "image not found")
 		return
 	}
@@ -170,24 +157,41 @@ func (h *UploadHandler) ServeImage(c *gin.Context) {
 	c.File(imagePath)
 }
 
-func (h *UploadHandler) ServeUploads(c *gin.Context) {
-	relativePath := c.Param("path")
-	if relativePath == "" {
-		response.BadRequest(c, "invalid path")
+func (h *UploadHandler) ServeModelFile(c *gin.Context) {
+	filename := strings.TrimPrefix(c.Param("filename"), "/")
+	if filename == "" {
+		response.BadRequest(c, "invalid filename")
 		return
 	}
 
-	cfg := config.AppConfig
-	fullPath := filepath.Join(cfg.UploadPath, relativePath)
-
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		response.NotFound(c, "file not found")
+	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		response.BadRequest(c, "invalid filename")
 		return
 	}
 
-	c.File(fullPath)
+	modelPath := h.storageService.GetFilePath("models", filename)
+
+	if !h.storageService.FileExists("models", filename) {
+		response.NotFound(c, "model file not found")
+		return
+	}
+
+	c.FileAttachment(modelPath, filename)
 }
 
-func init() {
-	_ = time.Now
+func (h *UploadHandler) DeleteModel(filename string) error {
+	return h.storageService.DeleteFile("models", filename)
+}
+
+func (h *UploadHandler) DeleteImage(filename string) error {
+	return h.storageService.DeleteFile("images", filename)
+}
+
+func getExtension(filename string) string {
+	for i := len(filename) - 1; i >= 0; i-- {
+		if filename[i] == '.' {
+			return filename[i:]
+		}
+	}
+	return ""
 }
