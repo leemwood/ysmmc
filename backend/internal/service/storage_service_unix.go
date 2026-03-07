@@ -6,7 +6,6 @@ package service
 import (
 	"errors"
 	"os"
-	"path/filepath"
 
 	"golang.org/x/sys/unix"
 )
