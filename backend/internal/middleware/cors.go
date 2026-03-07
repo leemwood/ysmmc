@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"strings"
 	"time"
 
@@ -13,9 +14,22 @@ func CORS() gin.HandlerFunc {
 		origin := c.Request.Header.Get("Origin")
 		allowedOrigins := config.AppConfig.AllowedOrigins
 		
+		if origin == "" {
+			c.Next()
+			return
+		}
+
 		allowedOrigin := ""
 		for _, o := range allowedOrigins {
 			if o == origin {
+				allowedOrigin = origin
+				break
+			}
+			if strings.HasPrefix(o, "*.") && strings.HasSuffix(origin, o[1:]) {
+				allowedOrigin = origin
+				break
+			}
+			if o == "*" {
 				allowedOrigin = origin
 				break
 			}
@@ -24,14 +38,19 @@ func CORS() gin.HandlerFunc {
 		if allowedOrigin != "" {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+			c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
+			c.Writer.Header().Set("Access-Control-Max-Age", "86400")
+		} else {
+			log.Printf("[CORS] Blocked origin: %s (allowed: %v)", origin, allowedOrigins)
 		}
-		
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
-		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
 
 		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
+			if allowedOrigin != "" {
+				c.AbortWithStatus(204)
+			} else {
+				c.AbortWithStatus(403)
+			}
 			return
 		}
 
