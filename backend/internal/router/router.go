@@ -17,6 +17,7 @@ func Setup(r *gin.Engine) {
 	favoriteHandler := handler.NewFavoriteHandler()
 	announcementHandler := handler.NewAnnouncementHandler()
 	uploadHandler := handler.NewUploadHandler()
+	fileHandler := handler.NewFileHandler()
 
 	api := r.Group("/api")
 	{
@@ -67,6 +68,13 @@ func Setup(r *gin.Engine) {
 			announcements.GET("", announcementHandler.List)
 			announcements.GET("/all", announcementHandler.ListAll)
 			announcements.GET("/:id", announcementHandler.GetByID)
+		}
+
+		files := api.Group("/files")
+		{
+			files.GET("/:id", fileHandler.GetFile)
+			files.POST("", middleware.Auth(), fileHandler.UploadFile)
+			files.DELETE("/:id", middleware.Auth(), fileHandler.DeleteFile)
 		}
 
 		upload := api.Group("/upload")

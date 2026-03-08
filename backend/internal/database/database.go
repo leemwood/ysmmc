@@ -42,6 +42,7 @@ func Migrate() error {
 	}
 
 	err := DB.AutoMigrate(
+		&model.File{},
 		&model.User{},
 		&model.Model{},
 		&model.Favorite{},

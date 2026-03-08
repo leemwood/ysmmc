@@ -8,18 +8,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ysmmc/backend/internal/config"
+	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
-	"github.com/ysmmc/backend/pkg/utils"
 )
 
 type UploadHandler struct {
 	storageService *service.StorageService
+	fileService    *service.FileService
 }
 
 func NewUploadHandler() *UploadHandler {
 	return &UploadHandler{
 		storageService: service.NewStorageService(),
+		fileService:    service.NewFileService(),
 	}
 }
 
@@ -52,7 +54,7 @@ func (h *UploadHandler) UploadModel(c *gin.Context) {
 	buf := new(bytes.Buffer)
 	tee := io.TeeReader(file, buf)
 
-	if err := utils.ValidateZipMagicNumber(tee); err != nil {
+	if err := validateZipMagicNumber(tee); err != nil {
 		response.BadRequest(c, "invalid file content: file does not appear to be a valid archive")
 		return
 	}
@@ -87,51 +89,54 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	}
 	defer file.Close()
 
-	cfg := config.AppConfig
-	maxImageSize := cfg.MaxFileSize / 10
-	if header.Size > maxImageSize {
-		response.BadRequest(c, "image too large")
-		return
-	}
-
 	ext := strings.ToLower(getExtension(header.Filename))
-	allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}
-	if !allowedExts[ext] {
+	mimeType := model.GetMimeTypeFromExtension(ext)
+
+	if !model.IsValidImageMimeType(mimeType) {
 		response.BadRequest(c, "invalid image type")
 		return
 	}
 
-	if err := h.storageService.ValidateFilename(header.Filename); err != nil {
-		response.BadRequest(c, err.Error())
+	maxImageSize := int64(10 * 1024 * 1024)
+	if header.Size > maxImageSize {
+		response.BadRequest(c, "image too large, maximum size is 10MB")
 		return
 	}
 
 	buf := new(bytes.Buffer)
 	tee := io.TeeReader(file, buf)
 
-	if err := utils.ValidateImageMagicNumber(tee, ext); err != nil {
+	if err := validateImageMagicNumber(tee, ext); err != nil {
 		response.BadRequest(c, "invalid image content: file does not match the declared type")
 		return
 	}
 
-	if err := h.storageService.CheckDiskSpace(); err != nil {
-		response.BadRequest(c, "insufficient disk space")
+	data, err := io.ReadAll(io.MultiReader(buf, file))
+	if err != nil {
+		response.InternalError(c, "failed to read file")
 		return
 	}
 
-	filename := uuid.New().String() + ext
-	multiReader := io.MultiReader(buf, file)
+	userIDStr, _ := c.Get("user_id")
+	var userID *uuid.UUID
+	if userIDStr != nil {
+		uid := userIDStr.(uuid.UUID)
+		userID = &uid
+	}
 
-	savedPath, err := h.storageService.SaveFile("images", filename, multiReader)
+	category := c.DefaultPostForm("category", "model_image")
+
+	savedFile, err := h.fileService.SaveFile(header.Filename, mimeType, data, category, userID)
 	if err != nil {
 		response.InternalError(c, "failed to save file")
 		return
 	}
 
 	response.Success(c, gin.H{
-		"file_name":  header.Filename,
-		"url":        "/uploads/" + savedPath,
-		"saved_path": savedPath,
+		"id":        savedFile.ID,
+		"file_id":   savedFile.ID,
+		"file_name": savedFile.Name,
+		"size":      savedFile.Size,
 	})
 }
 
@@ -187,11 +192,3 @@ func (h *UploadHandler) DeleteImage(filename string) error {
 	return h.storageService.DeleteFile("images", filename)
 }
 
-func getExtension(filename string) string {
-	for i := len(filename) - 1; i >= 0; i-- {
-		if filename[i] == '.' {
-			return filename[i:]
-		}
-	}
-	return ""
-}

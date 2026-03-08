@@ -27,23 +27,25 @@ func NewModelService() *ModelService {
 }
 
 type CreateModelRequest struct {
-	Title       string   `json:"title" binding:"required,max=255"`
-	Description *string  `json:"description"`
-	FilePath    string   `json:"file_path" binding:"required"`
-	FileSize    int64    `json:"file_size"`
-	ImageURL    *string  `json:"image_url"`
-	Tags        []string `json:"tags"`
-	IsPublic    bool     `json:"is_public"`
+	Title       string     `json:"title" binding:"required,max=255"`
+	Description *string    `json:"description"`
+	FilePath    string     `json:"file_path" binding:"required"`
+	FileSize    int64      `json:"file_size"`
+	ImageURL    *string    `json:"image_url"`
+	ImageID     *uuid.UUID `json:"image_id"`
+	Tags        []string   `json:"tags"`
+	IsPublic    bool       `json:"is_public"`
 }
 
 type UpdateModelRequest struct {
-	Title       *string  `json:"title"`
-	Description *string  `json:"description"`
-	FilePath    *string  `json:"file_path"`
-	FileSize    *int64   `json:"file_size"`
-	ImageURL    *string  `json:"image_url"`
-	Tags        []string `json:"tags"`
-	IsPublic    *bool    `json:"is_public"`
+	Title       *string    `json:"title"`
+	Description *string    `json:"description"`
+	FilePath    *string    `json:"file_path"`
+	FileSize    *int64     `json:"file_size"`
+	ImageURL    *string    `json:"image_url"`
+	ImageID     *uuid.UUID `json:"image_id"`
+	Tags        []string   `json:"tags"`
+	IsPublic    *bool      `json:"is_public"`
 }
 
 func (s *ModelService) Create(userID uuid.UUID, req *CreateModelRequest) (*model.Model, error) {
@@ -54,6 +56,7 @@ func (s *ModelService) Create(userID uuid.UUID, req *CreateModelRequest) (*model
 		FilePath:    req.FilePath,
 		FileSize:    req.FileSize,
 		ImageURL:    req.ImageURL,
+		ImageID:     req.ImageID,
 		Tags:        pq.StringArray(req.Tags),
 		IsPublic:    req.IsPublic,
 		Status:      "pending",
@@ -96,6 +99,9 @@ func (s *ModelService) Update(modelID, userID uuid.UUID, req *UpdateModelRequest
 		if req.ImageURL != nil {
 			m.ImageURL = req.ImageURL
 		}
+		if req.ImageID != nil {
+			m.ImageID = req.ImageID
+		}
 		if req.Tags != nil {
 			m.Tags = pq.StringArray(req.Tags)
 		}
@@ -108,6 +114,7 @@ func (s *ModelService) Update(modelID, userID uuid.UUID, req *UpdateModelRequest
 			Description: req.Description,
 			FilePath:    req.FilePath,
 			ImageURL:    req.ImageURL,
+			ImageID:     req.ImageID,
 			Tags:        req.Tags,
 			IsPublic:    req.IsPublic,
 		}
@@ -200,6 +207,9 @@ func (s *ModelService) Approve(modelID uuid.UUID) error {
 		}
 		if m.PendingChanges.ImageURL != nil {
 			m.ImageURL = m.PendingChanges.ImageURL
+		}
+		if m.PendingChanges.ImageID != nil {
+			m.ImageID = m.PendingChanges.ImageID
 		}
 		if m.PendingChanges.Tags != nil {
 			m.Tags = pq.StringArray(m.PendingChanges.Tags)

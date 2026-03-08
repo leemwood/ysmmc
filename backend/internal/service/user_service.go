@@ -26,9 +26,10 @@ func NewUserService() *UserService {
 }
 
 type UpdateProfileRequest struct {
-	Username  *string `json:"username"`
-	Bio       *string `json:"bio"`
-	AvatarURL *string `json:"avatar_url"`
+	Username  *string    `json:"username"`
+	Bio       *string    `json:"bio"`
+	AvatarURL *string    `json:"avatar_url"`
+	AvatarID  *uuid.UUID `json:"avatar_id"`
 }
 
 type ChangePasswordRequest struct {
@@ -71,11 +72,15 @@ func (s *UserService) UpdateProfile(userID uuid.UUID, req *UpdateProfileRequest,
 		if req.AvatarURL != nil {
 			user.AvatarURL = req.AvatarURL
 		}
+		if req.AvatarID != nil {
+			user.AvatarID = req.AvatarID
+		}
 	} else {
 		user.PendingChanges = &model.PendingChanges{
 			Username:  req.Username,
 			Bio:       req.Bio,
 			AvatarURL: req.AvatarURL,
+			AvatarID:  req.AvatarID,
 		}
 		user.ProfileStatus = "pending_review"
 	}
@@ -146,6 +151,9 @@ func (s *UserService) ApproveProfile(userID uuid.UUID) error {
 		}
 		if user.PendingChanges.AvatarURL != nil {
 			user.AvatarURL = user.PendingChanges.AvatarURL
+		}
+		if user.PendingChanges.AvatarID != nil {
+			user.AvatarID = user.PendingChanges.AvatarID
 		}
 		user.PendingChanges = nil
 	}

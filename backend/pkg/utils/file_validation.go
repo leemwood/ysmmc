@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -35,13 +36,24 @@ func ValidateImageMagicNumber(file io.Reader, ext string) error {
 	}
 	buf = buf[:n]
 
+	if len(buf) == 0 {
+		return errors.New("empty file")
+	}
+
 	for _, magic := range magicNumbers {
 		if bytes.HasPrefix(buf, magic) {
 			return nil
 		}
 	}
 
-	return errors.New("file content does not match the declared image type")
+	return fmt.Errorf("file content does not match the declared image type (ext: %s, header: %x)", ext, buf[:min(8, len(buf))])
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func ValidateZipMagicNumber(file io.Reader) error {
