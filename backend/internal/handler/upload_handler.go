@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"io"
+	"log"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -84,6 +85,7 @@ func (h *UploadHandler) UploadModel(c *gin.Context) {
 func (h *UploadHandler) UploadImage(c *gin.Context) {
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
+		log.Printf("UploadImage: no file uploaded: %v", err)
 		response.BadRequest(c, "no file uploaded")
 		return
 	}
@@ -91,14 +93,17 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 
 	ext := strings.ToLower(getExtension(header.Filename))
 	mimeType := model.GetMimeTypeFromExtension(ext)
+	log.Printf("UploadImage: filename=%s, ext=%s, mimeType=%s", header.Filename, ext, mimeType)
 
 	if !model.IsValidImageMimeType(mimeType) {
+		log.Printf("UploadImage: invalid image type: %s", mimeType)
 		response.BadRequest(c, "invalid image type")
 		return
 	}
 
 	maxImageSize := int64(10 * 1024 * 1024)
 	if header.Size > maxImageSize {
+		log.Printf("UploadImage: image too large: %d", header.Size)
 		response.BadRequest(c, "image too large, maximum size is 10MB")
 		return
 	}
@@ -107,12 +112,14 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	tee := io.TeeReader(file, buf)
 
 	if err := validateImageMagicNumber(tee, ext); err != nil {
+		log.Printf("UploadImage: invalid image content: %v", err)
 		response.BadRequest(c, "invalid image content: file does not match the declared type")
 		return
 	}
 
 	data, err := io.ReadAll(io.MultiReader(buf, file))
 	if err != nil {
+		log.Printf("UploadImage: failed to read file: %v", err)
 		response.InternalError(c, "failed to read file")
 		return
 	}
@@ -128,10 +135,12 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 
 	savedFile, err := h.fileService.SaveFile(header.Filename, mimeType, data, category, userID)
 	if err != nil {
+		log.Printf("UploadImage: failed to save file: %v", err)
 		response.InternalError(c, "failed to save file")
 		return
 	}
 
+	log.Printf("UploadImage: file saved successfully, id=%s", savedFile.ID)
 	response.Success(c, gin.H{
 		"id":        savedFile.ID,
 		"file_id":   savedFile.ID,

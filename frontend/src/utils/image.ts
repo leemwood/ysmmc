@@ -12,7 +12,7 @@ export function getImageUrl(imageId: string | null | undefined, fallbackUrl?: st
     const baseUrl = isDev ? '' : 'https://api.ysmmc.cn'
     return `${baseUrl}${fallbackUrl}`
   }
-  return '/placeholder.png'
+  return '/placeholder.svg'
 }
 
 export function getAvatarUrl(avatarId: string | null | undefined, avatarUrl?: string | null | undefined): string {
