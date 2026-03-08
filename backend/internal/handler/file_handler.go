@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -145,6 +146,8 @@ func validateImageMagicNumber(reader io.Reader, ext string) error {
 		return nil
 	}
 
+	fmt.Printf("validateImageMagicNumber: ext=%s, bytesRead=%d, buf=%v\n", ext, n, buf[:min(n, 8)])
+
 	for _, magic := range magics {
 		if len(buf) >= len(magic) {
 			match := true
@@ -161,6 +164,13 @@ func validateImageMagicNumber(reader io.Reader, ext string) error {
 	}
 
 	return errInvalidImage
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 var errInvalidZip = errors.New("invalid zip content")
