@@ -13,6 +13,7 @@ func Setup(r *gin.Engine) {
 	authHandler := handler.NewAuthHandler()
 	userHandler := handler.NewUserHandler()
 	modelHandler := handler.NewModelHandler()
+	modelVersionHandler := handler.NewModelVersionHandler()
 	adminHandler := handler.NewAdminHandler()
 	favoriteHandler := handler.NewFavoriteHandler()
 	announcementHandler := handler.NewAnnouncementHandler()
@@ -55,6 +56,13 @@ func Setup(r *gin.Engine) {
 			models.POST("/:id/favorite", middleware.Auth(), modelHandler.AddFavorite)
 			models.DELETE("/:id/favorite", middleware.Auth(), modelHandler.RemoveFavorite)
 			models.GET("/:id/favorite", middleware.Auth(), modelHandler.CheckFavorite)
+			models.GET("/:id/versions", modelVersionHandler.ListVersions)
+			models.POST("/:id/versions", middleware.Auth(), modelVersionHandler.CreateVersion)
+			models.GET("/:id/versions/:versionId", modelVersionHandler.GetVersion)
+			models.PUT("/:id/versions/:versionId", middleware.Auth(), modelVersionHandler.UpdateVersion)
+			models.PUT("/:id/versions/:versionId/current", middleware.Auth(), modelVersionHandler.SetCurrentVersion)
+			models.DELETE("/:id/versions/:versionId", middleware.Auth(), modelVersionHandler.DeleteVersion)
+			models.POST("/:id/versions/:versionId/download", modelVersionHandler.DownloadVersion)
 		}
 
 		favorites := api.Group("/favorites")

@@ -19,7 +19,7 @@ type Model struct {
 	FileSize        int64                `json:"file_size" gorm:"default:0"`
 	ImageID         *uuid.UUID           `json:"image_id" gorm:"type:uuid"`
 	Image           *File                `json:"image,omitempty" gorm:"foreignKey:ImageID"`
-	ImageURL        *string              `json:"image_url" gorm:"type:text"` // 兼容旧数据
+	ImageURL        *string              `json:"image_url" gorm:"type:text"`
 	Tags            pq.StringArray       `json:"tags" gorm:"type:text[]"`
 	IsPublic        bool                 `json:"is_public" gorm:"default:true"`
 	Status          string               `json:"status" gorm:"size:20;default:pending;index"`
@@ -27,10 +27,14 @@ type Model struct {
 	PendingChanges  *ModelPendingChanges `json:"pending_changes" gorm:"type:jsonb"`
 	Downloads       int                  `json:"downloads" gorm:"default:0"`
 	RejectionReason *string              `json:"rejection_reason" gorm:"type:text"`
+	CurrentVersionID *uuid.UUID          `json:"current_version_id" gorm:"type:uuid"`
+	VersionCount    int                  `json:"version_count" gorm:"default:1"`
 	CreatedAt       time.Time            `json:"created_at" gorm:"index"`
 	UpdatedAt       time.Time            `json:"updated_at"`
 
-	User *User `json:"user,omitempty" gorm:"foreignKey:UserID"`
+	User           *User          `json:"user,omitempty" gorm:"foreignKey:UserID"`
+	CurrentVersion *ModelVersion  `json:"current_version,omitempty" gorm:"foreignKey:CurrentVersionID"`
+	Versions       []ModelVersion `json:"versions,omitempty" gorm:"foreignKey:ModelID"`
 }
 
 type ModelPendingChanges struct {

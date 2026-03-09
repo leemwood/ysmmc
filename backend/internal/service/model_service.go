@@ -2,7 +2,7 @@ package service
 
 import (
 	"errors"
-
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -134,14 +134,29 @@ func (s *ModelService) Delete(modelID, userID uuid.UUID, isAdmin bool) error {
 		return err
 	}
 
+	log.Printf("Delete: modelID=%s, modelUserID=%s, requestUserID=%s, isAdmin=%v", modelID, m.UserID, userID, isAdmin)
+
 	if m.UserID != userID && !isAdmin {
 		return errors.New("unauthorized")
 	}
 
+	// Delete associated favorites first (to avoid foreign key constraint)
+	favoriteRepo := repository.NewFavoriteRepository()
+	if err := favoriteRepo.DeleteByModel(modelID); err != nil {
+		log.Printf("Delete: error deleting favorites: %v", err)
+	}
+
 	// Delete associated files
 	if err := deleteModelFiles(m); err != nil {
-		// Log error but continue with DB deletion
-		// In a real production system, you might want to retry or handle this better
+		log.Printf("Delete: error deleting files: %v", err)
+	}
+
+	// Delete associated image from database if exists
+	if m.ImageID != nil {
+		fileService := NewFileService()
+		if err := fileService.DeleteFile(*m.ImageID); err != nil {
+			log.Printf("Delete: error deleting image file from database: %v", err)
+		}
 	}
 
 	return s.modelRepo.Delete(modelID)

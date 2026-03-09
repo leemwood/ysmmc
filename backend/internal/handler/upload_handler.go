@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ysmmc/backend/internal/config"
-	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
 )
@@ -91,16 +90,6 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	}
 	defer file.Close()
 
-	ext := strings.ToLower(getExtension(header.Filename))
-	mimeType := model.GetMimeTypeFromExtension(ext)
-	log.Printf("UploadImage: filename=%s, ext=%s, mimeType=%s", header.Filename, ext, mimeType)
-
-	if !model.IsValidImageMimeType(mimeType) {
-		log.Printf("UploadImage: invalid image type: %s", mimeType)
-		response.BadRequest(c, "invalid image type")
-		return
-	}
-
 	maxImageSize := int64(10 * 1024 * 1024)
 	if header.Size > maxImageSize {
 		log.Printf("UploadImage: image too large: %d", header.Size)
@@ -111,18 +100,33 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	buf := new(bytes.Buffer)
 	tee := io.TeeReader(file, buf)
 
-	if err := validateImageMagicNumber(tee, ext); err != nil {
-		log.Printf("UploadImage: invalid image content: %v", err)
-		response.BadRequest(c, "invalid image content: file does not match the declared type")
+	headerBuf := make([]byte, 16)
+	n, readErr := tee.Read(headerBuf)
+	log.Printf("UploadImage: read %d bytes for magic check, err=%v, bytes=%v", n, readErr, headerBuf[:n])
+
+	if n < 8 {
+		log.Printf("UploadImage: file too small, only %d bytes", n)
+		response.BadRequest(c, "file too small")
 		return
 	}
 
-	data, err := io.ReadAll(io.MultiReader(buf, file))
+	if err := validateImageMagicNumber(headerBuf[:n], ""); err != nil {
+		log.Printf("UploadImage: invalid image content: %v", err)
+		response.BadRequest(c, "invalid image content: file is not a valid image")
+		return
+	}
+
+	mimeType := detectMimeType(headerBuf[:n])
+	log.Printf("UploadImage: filename=%s, detected mimeType=%s", header.Filename, mimeType)
+
+	restData, err := io.ReadAll(file)
 	if err != nil {
-		log.Printf("UploadImage: failed to read file: %v", err)
+		log.Printf("UploadImage: failed to read rest of file: %v", err)
 		response.InternalError(c, "failed to read file")
 		return
 	}
+
+	data := append(buf.Bytes(), restData...)
 
 	userIDStr, _ := c.Get("user_id")
 	var userID *uuid.UUID
@@ -147,6 +151,73 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 		"file_name": savedFile.Name,
 		"size":      savedFile.Size,
 	})
+}
+
+func detectMimeType(data []byte) string {
+	if len(data) < 3 {
+		return "application/octet-stream"
+	}
+
+	jpegMagic := []byte{0xFF, 0xD8, 0xFF}
+	pngMagic := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+	gifMagic1 := []byte{0x47, 0x49, 0x46, 0x38, 0x37, 0x61}
+	gifMagic2 := []byte{0x47, 0x49, 0x46, 0x38, 0x39, 0x61}
+	webpMagic := []byte{0x52, 0x49, 0x46, 0x46}
+
+	if data[0] == jpegMagic[0] && data[1] == jpegMagic[1] && data[2] == jpegMagic[2] {
+		return "image/jpeg"
+	}
+
+	if len(data) >= 8 {
+		isPNG := true
+		for i, b := range pngMagic {
+			if data[i] != b {
+				isPNG = false
+				break
+			}
+		}
+		if isPNG {
+			return "image/png"
+		}
+	}
+
+	if len(data) >= 6 {
+		isGIF := true
+		for i, b := range gifMagic1 {
+			if data[i] != b {
+				isGIF = false
+				break
+			}
+		}
+		if isGIF {
+			return "image/gif"
+		}
+		isGIF = true
+		for i, b := range gifMagic2 {
+			if data[i] != b {
+				isGIF = false
+				break
+			}
+		}
+		if isGIF {
+			return "image/gif"
+		}
+	}
+
+	if len(data) >= 4 {
+		isWebP := true
+		for i, b := range webpMagic {
+			if data[i] != b {
+				isWebP = false
+				break
+			}
+		}
+		if isWebP {
+			return "image/webp"
+		}
+	}
+
+	return "application/octet-stream"
 }
 
 func (h *UploadHandler) ServeImage(c *gin.Context) {

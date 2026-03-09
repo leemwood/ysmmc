@@ -45,12 +45,17 @@ func Migrate() error {
 		&model.File{},
 		&model.User{},
 		&model.Model{},
+		&model.ModelVersion{},
 		&model.Favorite{},
 		&model.Announcement{},
 		&model.Session{},
 	)
 	if err != nil {
 		log.Printf("Warning: auto migrate error: %v", err)
+	}
+
+	if err := migrateModelVersions(); err != nil {
+		log.Printf("Warning: failed to migrate model versions: %v", err)
 	}
 
 	log.Println("Database migrated successfully")
@@ -67,6 +72,48 @@ func migrateSuperAdminRole() error {
 		log.Println("Migrated admin user role to super_admin")
 	}
 
+	return nil
+}
+
+func migrateModelVersions() error {
+	var models []model.Model
+	if err := DB.Where("current_version_id IS NULL").Find(&models).Error; err != nil {
+		return err
+	}
+
+	if len(models) == 0 {
+		return nil
+	}
+
+	log.Printf("Migrating %d models to version system...", len(models))
+
+	for _, m := range models {
+		version := model.ModelVersion{
+			ModelID:       m.ID,
+			VersionNumber: "1.0.0",
+			Description:   m.Description,
+			FilePath:      m.FilePath,
+			FileSize:      m.FileSize,
+			ImageID:       m.ImageID,
+			ImageURL:      m.ImageURL,
+			IsCurrent:     true,
+			Downloads:     m.Downloads,
+		}
+
+		if err := DB.Create(&version).Error; err != nil {
+			log.Printf("Failed to create version for model %s: %v", m.ID, err)
+			continue
+		}
+
+		if err := DB.Model(&m).Updates(map[string]interface{}{
+			"current_version_id": version.ID,
+			"version_count":      1,
+		}).Error; err != nil {
+			log.Printf("Failed to update model %s: %v", m.ID, err)
+		}
+	}
+
+	log.Printf("Migrated %d models to version system", len(models))
 	return nil
 }
 

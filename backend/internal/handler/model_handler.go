@@ -105,7 +105,8 @@ func (h *ModelHandler) Update(c *gin.Context) {
 		return
 	}
 
-	model, err := h.modelService.Update(id, userID, &req, role == "admin")
+	isAdmin := role == "admin" || role == "super_admin"
+	model, err := h.modelService.Update(id, userID, &req, isAdmin)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -124,7 +125,8 @@ func (h *ModelHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	role := middleware.GetRole(c)
 
-	if err := h.modelService.Delete(id, userID, role == "admin"); err != nil {
+	isAdmin := role == "admin" || role == "super_admin"
+	if err := h.modelService.Delete(id, userID, isAdmin); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}

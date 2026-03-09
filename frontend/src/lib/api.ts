@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios'
-import type { ApiResponse, LoginResponse, User, Model, PaginatedResponse, Announcement, Favorite } from '@/types'
+import type { ApiResponse, LoginResponse, User, Model, ModelVersion, PaginatedResponse, Announcement, Favorite } from '@/types'
 
 const isDev = import.meta.env.DEV
 
@@ -121,6 +121,40 @@ export const modelApi = {
   removeFavorite: (id: string) => api.delete<ApiResponse<null>>(`/models/${id}/favorite`),
 
   checkFavorite: (id: string) => api.get<ApiResponse<{ is_favorited: boolean }>>(`/models/${id}/favorite`),
+}
+
+export const modelVersionApi = {
+  list: (modelId: string) =>
+    api.get<ApiResponse<ModelVersion[]>>(`/models/${modelId}/versions`),
+
+  get: (modelId: string, versionId: string) =>
+    api.get<ApiResponse<ModelVersion>>(`/models/${modelId}/versions/${versionId}`),
+
+  create: (modelId: string, data: {
+    version_number: string
+    description?: string
+    file_path: string
+    file_size: number
+    image_id?: string
+    image_url?: string
+    changelog?: string
+  }) => api.post<ApiResponse<ModelVersion>>(`/models/${modelId}/versions`, data),
+
+  update: (modelId: string, versionId: string, data: {
+    description?: string
+    image_id?: string
+    image_url?: string
+    changelog?: string
+  }) => api.put<ApiResponse<ModelVersion>>(`/models/${modelId}/versions/${versionId}`, data),
+
+  setCurrent: (modelId: string, versionId: string) =>
+    api.put<ApiResponse<null>>(`/models/${modelId}/versions/${versionId}/current`),
+
+  delete: (modelId: string, versionId: string) =>
+    api.delete<ApiResponse<null>>(`/models/${modelId}/versions/${versionId}`),
+
+  download: (modelId: string, versionId: string) =>
+    api.post<ApiResponse<{ download_url: string; file_name: string }>>(`/models/${modelId}/versions/${versionId}/download`),
 }
 
 export const favoriteApi = {

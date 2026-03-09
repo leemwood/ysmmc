@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -57,19 +56,30 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 		return
 	}
 
-	buf := new(bytes.Buffer)
-	tee := io.TeeReader(file, buf)
+	headerBuf := make([]byte, 16)
+	n, readErr := file.Read(headerBuf)
+	if readErr != nil && readErr != io.EOF {
+		response.BadRequest(c, "failed to read file header")
+		return
+	}
 
-	if err := validateImageMagicNumber(tee, ext); err != nil {
+	if n < 8 {
+		response.BadRequest(c, "file too small")
+		return
+	}
+
+	if err := validateImageMagicNumber(headerBuf[:n], ext); err != nil {
 		response.BadRequest(c, "invalid image content: file does not match the declared type")
 		return
 	}
 
-	data, err := io.ReadAll(io.MultiReader(buf, file))
+	restData, err := io.ReadAll(file)
 	if err != nil {
 		response.InternalError(c, "failed to read file")
 		return
 	}
+
+	data := append(headerBuf[:n], restData...)
 
 	category := c.DefaultPostForm("category", "general")
 	userIDStr, _ := c.Get("user_id")
@@ -125,42 +135,53 @@ func getExtension(filename string) string {
 
 var errInvalidImage = errors.New("invalid image content")
 
-func validateImageMagicNumber(reader io.Reader, ext string) error {
-	buf := make([]byte, 16)
-	n, err := reader.Read(buf)
-	if err != nil && err != io.EOF {
-		return err
-	}
-	buf = buf[:n]
-
-	magicNumbers := map[string][][]byte{
-		".jpg":  {{0xFF, 0xD8, 0xFF}},
-		".jpeg": {{0xFF, 0xD8, 0xFF}},
-		".png":  {{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}},
-		".gif":  {{0x47, 0x49, 0x46, 0x38, 0x37, 0x61}, {0x47, 0x49, 0x46, 0x38, 0x39, 0x61}},
-		".webp": {{0x52, 0x49, 0x46, 0x46}},
+func validateImageMagicNumber(data []byte, ext string) error {
+	if len(data) < 8 {
+		return errors.New("file too small")
 	}
 
-	magics, ok := magicNumbers[ext]
-	if !ok {
-		return nil
+	fmt.Printf("validateImageMagicNumber: ext=%s, len=%d, data=%v\n", ext, len(data), data[:8])
+
+	jpegMagic := []byte{0xFF, 0xD8, 0xFF}
+	pngMagic := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+	gifMagic1 := []byte{0x47, 0x49, 0x46, 0x38, 0x37, 0x61}
+	gifMagic2 := []byte{0x47, 0x49, 0x46, 0x38, 0x39, 0x61}
+	webpMagic := []byte{0x52, 0x49, 0x46, 0x46}
+
+	isJPEG := len(data) >= 3 && data[0] == jpegMagic[0] && data[1] == jpegMagic[1] && data[2] == jpegMagic[2]
+	isPNG := len(data) >= 8
+	for i, b := range pngMagic {
+		if data[i] != b {
+			isPNG = false
+			break
+		}
 	}
-
-	fmt.Printf("validateImageMagicNumber: ext=%s, bytesRead=%d, buf=%v\n", ext, n, buf[:min(n, 8)])
-
-	for _, magic := range magics {
-		if len(buf) >= len(magic) {
-			match := true
-			for i, b := range magic {
-				if buf[i] != b {
-					match = false
-					break
-				}
-			}
-			if match {
-				return nil
+	isGIF := len(data) >= 6
+	for i, b := range gifMagic1 {
+		if data[i] != b {
+			isGIF = false
+			break
+		}
+	}
+	if !isGIF {
+		isGIF = len(data) >= 6
+		for i, b := range gifMagic2 {
+			if data[i] != b {
+				isGIF = false
+				break
 			}
 		}
+	}
+	isWebP := len(data) >= 4
+	for i, b := range webpMagic {
+		if data[i] != b {
+			isWebP = false
+			break
+		}
+	}
+
+	if isJPEG || isPNG || isGIF || isWebP {
+		return nil
 	}
 
 	return errInvalidImage

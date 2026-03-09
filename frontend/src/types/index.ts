@@ -37,9 +37,13 @@ export interface Model {
   pending_changes: ModelPendingChanges | null
   downloads: number
   rejection_reason: string | null
+  current_version_id: string | null
+  version_count: number
   created_at: string
   updated_at: string
   user?: User
+  current_version?: ModelVersion
+  versions?: ModelVersion[]
 }
 
 export interface ModelPendingChanges {
@@ -50,6 +54,23 @@ export interface ModelPendingChanges {
   image_url?: string
   image_id?: string
   is_public?: boolean
+}
+
+export interface ModelVersion {
+  id: string
+  model_id: string
+  version_number: string
+  description: string | null
+  file_path: string
+  file_size: number
+  image_id: string | null
+  image_url: string | null
+  changelog: string | null
+  is_current: boolean
+  downloads: number
+  created_at: string
+  updated_at: string
+  model?: Model
 }
 
 export interface FileData {

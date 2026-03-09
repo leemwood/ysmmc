@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { modelApi } from '@/lib/api'
+import { modelApi, modelVersionApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import type { Model } from '@/types'
+import type { Model, ModelVersion } from '@/types'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Download, Heart, Edit, Trash2, User, Calendar, Tag, ArrowLeft } from 'lucide-vue-next'
+import { Download, Heart, Edit, Trash2, User, Calendar, Tag, ArrowLeft, History, Plus, Check } from 'lucide-vue-next'
 import { getModelImageUrl, getAvatarUrl } from '@/utils/image'
 
 const route = useRoute()
@@ -28,6 +28,9 @@ const model = ref<Model | null>(null)
 const loading = ref(true)
 const isFavorited = ref(false)
 const favoriteCount = ref(0)
+const versions = ref<ModelVersion[]>([])
+const versionsLoading = ref(false)
+const showVersions = ref(false)
 
 const loginPromptDialog = ref(false)
 const actionMessage = ref('')
@@ -59,15 +62,46 @@ async function fetchModel() {
   }
 }
 
+async function fetchVersions() {
+  if (!model.value) return
+  versionsLoading.value = true
+  try {
+    const response = await modelVersionApi.list(model.value.id)
+    versions.value = response.data.data || []
+  } catch (error) {
+    console.error('Failed to fetch versions:', error)
+  } finally {
+    versionsLoading.value = false
+  }
+}
+
 async function handleDownload() {
   if (!model.value) return
   
   try {
     await modelApi.download(model.value.id)
-    window.open(`/uploads/${model.value.file_path.split('/').pop()}`, '_blank')
+    const filename = model.value.file_path.split('/').pop()
+    const isDev = import.meta.env.DEV
+    const baseUrl = isDev ? '' : 'https://api.ysmmc.cn'
+    window.open(`${baseUrl}/api/uploads/models/${filename}`, '_blank')
     fetchModel()
   } catch (error) {
     console.error('Failed to download:', error)
+  }
+}
+
+async function handleVersionDownload(version: ModelVersion) {
+  if (!model.value) return
+  
+  try {
+    await modelVersionApi.download(model.value.id, version.id)
+    const filename = version.file_path.split('/').pop()
+    const isDev = import.meta.env.DEV
+    const baseUrl = isDev ? '' : 'https://api.ysmmc.cn'
+    window.open(`${baseUrl}/api/uploads/models/${filename}`, '_blank')
+    fetchVersions()
+  } catch (error) {
+    console.error('Failed to download version:', error)
   }
 }
 
@@ -106,6 +140,31 @@ async function handleDelete() {
   }
 }
 
+async function setCurrentVersion(version: ModelVersion) {
+  if (!model.value) return
+  
+  try {
+    await modelVersionApi.setCurrent(model.value.id, version.id)
+    showActionMessage('已设置为当前版本')
+    await fetchModel()
+    await fetchVersions()
+  } catch (error: any) {
+    showActionMessage(error.response?.data?.message || '操作失败', 'error')
+  }
+}
+
+async function deleteVersion(version: ModelVersion) {
+  if (!model.value || !confirm('确定要删除这个版本吗？')) return
+  
+  try {
+    await modelVersionApi.delete(model.value.id, version.id)
+    showActionMessage('版本已删除')
+    await fetchVersions()
+  } catch (error: any) {
+    showActionMessage(error.response?.data?.message || '删除失败', 'error')
+  }
+}
+
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString('zh-CN')
 }
@@ -116,6 +175,13 @@ function formatFileSize(bytes: number) {
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+function toggleVersions() {
+  showVersions.value = !showVersions.value
+  if (showVersions.value && versions.value.length === 0) {
+    fetchVersions()
+  }
 }
 
 onMounted(fetchModel)
@@ -201,6 +267,12 @@ onMounted(fetchModel)
         <span class="text-sm text-muted-foreground">
           文件大小: {{ formatFileSize(model.file_size) }}
         </span>
+        <span v-if="model.current_version" class="text-sm text-muted-foreground">
+          当前版本: {{ model.current_version.version_number }}
+        </span>
+        <span v-if="model.version_count > 1" class="text-sm text-muted-foreground">
+          共 {{ model.version_count }} 个版本
+        </span>
       </div>
 
       <div class="mb-6 flex flex-wrap gap-2">
@@ -210,12 +282,96 @@ onMounted(fetchModel)
         </Badge>
       </div>
 
-      <Card>
+      <Card class="mb-6">
         <CardHeader>
           <CardTitle>描述</CardTitle>
         </CardHeader>
         <CardContent>
           <p class="whitespace-pre-wrap">{{ model.description || '暂无描述' }}</p>
+        </CardContent>
+      </Card>
+
+      <Card class="mb-6">
+        <CardHeader class="cursor-pointer" @click="toggleVersions">
+          <div class="flex items-center justify-between">
+            <CardTitle class="flex items-center gap-2">
+              <History class="h-5 w-5" />
+              版本历史
+            </CardTitle>
+            <div class="flex items-center gap-2">
+              <Button
+                v-if="isOwner || authStore.isAdmin"
+                variant="outline"
+                size="sm"
+                @click.stop="router.push(`/model/${model.id}/versions/new`)"
+              >
+                <Plus class="mr-1 h-4 w-4" />
+                新版本
+              </Button>
+              <span class="text-sm text-muted-foreground">{{ showVersions ? '收起' : '展开' }}</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent v-if="showVersions">
+          <div v-if="versionsLoading" class="py-4 text-center text-muted-foreground">
+            加载中...
+          </div>
+          <div v-else-if="versions.length === 0" class="py-4 text-center text-muted-foreground">
+            暂无版本记录
+          </div>
+          <div v-else class="space-y-4">
+            <div
+              v-for="version in versions"
+              :key="version.id"
+              class="rounded-lg border p-4"
+              :class="{ 'border-primary bg-primary/5': version.is_current }"
+            >
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold">{{ version.version_number }}</span>
+                    <Badge v-if="version.is_current" variant="default" class="text-xs">
+                      当前版本
+                    </Badge>
+                  </div>
+                  <p v-if="version.description" class="mt-1 text-sm text-muted-foreground">
+                    {{ version.description }}
+                  </p>
+                  <div class="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>{{ formatDate(version.created_at) }}</span>
+                    <span>{{ formatFileSize(version.file_size) }}</span>
+                    <span>{{ version.downloads }} 次下载</span>
+                  </div>
+                  <p v-if="version.changelog" class="mt-2 whitespace-pre-wrap text-sm">
+                    {{ version.changelog }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <Button variant="outline" size="sm" @click="handleVersionDownload(version)">
+                    <Download class="mr-1 h-3 w-3" />
+                    下载
+                  </Button>
+                  <Button
+                    v-if="!version.is_current && (isOwner || authStore.isAdmin)"
+                    variant="outline"
+                    size="sm"
+                    @click="setCurrentVersion(version)"
+                  >
+                    <Check class="mr-1 h-3 w-3" />
+                    设为当前
+                  </Button>
+                  <Button
+                    v-if="!version.is_current && (isOwner || authStore.isAdmin)"
+                    variant="destructive"
+                    size="sm"
+                    @click="deleteVersion(version)"
+                  >
+                    <Trash2 class="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

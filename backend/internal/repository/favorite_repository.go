@@ -52,3 +52,7 @@ func (r *FavoriteRepository) CountByModel(modelID uuid.UUID) (int64, error) {
 	err := database.DB.Model(&model.Favorite{}).Where("model_id = ?", modelID).Count(&count).Error
 	return count, err
 }
+
+func (r *FavoriteRepository) DeleteByModel(modelID uuid.UUID) error {
+	return database.DB.Where("model_id = ?", modelID).Delete(&model.Favorite{}).Error
+}
