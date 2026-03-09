@@ -1,8 +1,12 @@
 package handler
 
 import (
+	"path/filepath"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/ysmmc/backend/internal/config"
 	"github.com/ysmmc/backend/internal/middleware"
 	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
@@ -181,4 +185,45 @@ func (h *ModelVersionHandler) DownloadVersion(c *gin.Context) {
 		"download_url": "/api/models/" + version.ModelID.String() + "/versions/" + versionID.String() + "/file",
 		"file_name":    version.Model.Title + "-" + version.VersionNumber,
 	})
+}
+
+func (h *ModelVersionHandler) ServeVersionFile(c *gin.Context) {
+	versionID, err := uuid.Parse(c.Param("versionId"))
+	if err != nil {
+		response.BadRequest(c, "invalid version id")
+		return
+	}
+
+	version, err := h.versionService.GetVersion(versionID)
+	if err != nil {
+		response.NotFound(c, "version not found")
+		return
+	}
+
+	if version.Model == nil {
+		response.NotFound(c, "model not found")
+		return
+	}
+
+	if version.Model.Status != "approved" {
+		response.Forbidden(c, "model is not available for download")
+		return
+	}
+
+	filePath := version.FilePath
+	if strings.HasPrefix(filePath, "/uploads/") {
+		filePath = strings.TrimPrefix(filePath, "/uploads/")
+	}
+
+	fullPath := filepath.Join(config.AppConfig.UploadPath, filePath)
+
+	fileName := version.Model.Title + "-" + version.VersionNumber
+	ext := filepath.Ext(version.FilePath)
+	if ext != "" {
+		fileName = fileName + ext
+	}
+
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.FileAttachment(fullPath, fileName)
 }

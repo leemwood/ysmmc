@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios'
-import type { ApiResponse, LoginResponse, User, Model, ModelVersion, PaginatedResponse, Announcement, Favorite } from '@/types'
+import type { ApiResponse, LoginResponse, User, Model, ModelVersion, ModelImage, PaginatedResponse, Announcement, Favorite } from '@/types'
 
 const isDev = import.meta.env.DEV
 
@@ -157,6 +157,20 @@ export const modelVersionApi = {
     api.post<ApiResponse<{ download_url: string; file_name: string }>>(`/models/${modelId}/versions/${versionId}/download`),
 }
 
+export const modelImageApi = {
+  list: (modelId: string) =>
+    api.get<ApiResponse<ModelImage[]>>(`/models/${modelId}/images`),
+
+  add: (modelId: string, fileId: string) =>
+    api.post<ApiResponse<ModelImage>>(`/models/${modelId}/images`, { file_id: fileId }),
+
+  delete: (modelId: string, fileId: string) =>
+    api.delete<ApiResponse<null>>(`/models/${modelId}/images/${fileId}`),
+
+  updateOrder: (modelId: string, images: { file_id: string; sort_order: number }[]) =>
+    api.put<ApiResponse<null>>(`/models/${modelId}/images/order`, { images }),
+}
+
 export const favoriteApi = {
   list: (page = 1, pageSize = 12) =>
     api.get<ApiResponse<PaginatedResponse<Favorite>>>('/favorites', {
@@ -189,6 +203,11 @@ export const adminApi = {
   getSuperAdmin: () =>
     api.get<ApiResponse<User>>('/admin/super-admin'),
 
+  listAllModels: (page = 1, pageSize = 20, status = '', search = '') =>
+    api.get<ApiResponse<PaginatedResponse<Model>>>('/admin/models', {
+      params: { page, page_size: pageSize, status, search },
+    }),
+
   listPendingModels: (page = 1, pageSize = 20) =>
     api.get<ApiResponse<PaginatedResponse<Model>>>('/admin/models/pending', {
       params: { page, page_size: pageSize },
@@ -203,6 +222,9 @@ export const adminApi = {
 
   rejectModel: (id: string, reason: string) =>
     api.put<ApiResponse<null>>(`/admin/models/${id}/reject`, { reason }),
+
+  deleteModel: (id: string) =>
+    api.delete<ApiResponse<null>>(`/admin/models/${id}`),
 
   listUsers: (page = 1, pageSize = 20) =>
     api.get<ApiResponse<PaginatedResponse<User>>>('/admin/users', {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { modelApi, modelVersionApi } from '@/lib/api'
+import { modelApi, modelVersionApi, modelImageApi, fileApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import type { Model, ModelVersion } from '@/types'
+import type { Model, ModelVersion, ModelImage } from '@/types'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Download, Heart, Edit, Trash2, User, Calendar, Tag, ArrowLeft, History, Plus, Check } from 'lucide-vue-next'
+import { Download, Heart, Edit, Trash2, User, Calendar, Tag, ArrowLeft, History, Plus, Check, ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
 import { getModelImageUrl, getAvatarUrl } from '@/utils/image'
 
 const route = useRoute()
@@ -31,6 +31,9 @@ const favoriteCount = ref(0)
 const versions = ref<ModelVersion[]>([])
 const versionsLoading = ref(false)
 const showVersions = ref(false)
+const images = ref<ModelImage[]>([])
+const imagesLoading = ref(false)
+const currentImageIndex = ref(0)
 
 const loginPromptDialog = ref(false)
 const actionMessage = ref('')
@@ -39,6 +42,8 @@ const actionMessageType = ref<'success' | 'error'>('success')
 const isOwner = computed(() => {
   return authStore.user?.id === model.value?.user_id
 })
+
+const hasGalleryImages = computed(() => images.value.length > 0)
 
 function showActionMessage(msg: string, type: 'success' | 'error' = 'success') {
   actionMessage.value = msg
@@ -54,11 +59,25 @@ async function fetchModel() {
     model.value = data.model
     isFavorited.value = data.is_favorited
     favoriteCount.value = data.favorite_count
+    fetchImages()
   } catch (error) {
     console.error('Failed to fetch model:', error)
     router.push('/')
   } finally {
     loading.value = false
+  }
+}
+
+async function fetchImages() {
+  if (!model.value) return
+  imagesLoading.value = true
+  try {
+    const response = await modelImageApi.list(model.value.id)
+    images.value = response.data.data || []
+  } catch (error) {
+    console.error('Failed to fetch images:', error)
+  } finally {
+    imagesLoading.value = false
   }
 }
 
@@ -79,12 +98,17 @@ async function handleDownload() {
   if (!model.value) return
   
   try {
-    await modelApi.download(model.value.id)
-    const filename = model.value.file_path.split('/').pop()
-    const isDev = import.meta.env.DEV
-    const baseUrl = isDev ? '' : 'https://api.ysmmc.cn'
-    window.open(`${baseUrl}/api/uploads/models/${filename}`, '_blank')
-    fetchModel()
+    const res = await modelApi.download(model.value.id)
+    const data = res.data.data
+    if (data) {
+      const downloadUrl = (data as { download_url?: string; file_path?: string }).download_url
+      if (downloadUrl) {
+        const isDev = import.meta.env.DEV
+        const baseUrl = isDev ? '' : 'https://api.ysmmc.cn'
+        window.open(`${baseUrl}${downloadUrl}`, '_blank')
+        fetchModel()
+      }
+    }
   } catch (error) {
     console.error('Failed to download:', error)
   }
@@ -94,12 +118,17 @@ async function handleVersionDownload(version: ModelVersion) {
   if (!model.value) return
   
   try {
-    await modelVersionApi.download(model.value.id, version.id)
-    const filename = version.file_path.split('/').pop()
-    const isDev = import.meta.env.DEV
-    const baseUrl = isDev ? '' : 'https://api.ysmmc.cn'
-    window.open(`${baseUrl}/api/uploads/models/${filename}`, '_blank')
-    fetchVersions()
+    const res = await modelVersionApi.download(model.value.id, version.id)
+    const data = res.data.data
+    if (data) {
+      const downloadUrl = (data as { download_url?: string }).download_url
+      if (downloadUrl) {
+        const isDev = import.meta.env.DEV
+        const baseUrl = isDev ? '' : 'https://api.ysmmc.cn'
+        window.open(`${baseUrl}${downloadUrl}`, '_blank')
+        fetchVersions()
+      }
+    }
   } catch (error) {
     console.error('Failed to download version:', error)
   }
@@ -165,6 +194,18 @@ async function deleteVersion(version: ModelVersion) {
   }
 }
 
+async function deleteImage(image: ModelImage) {
+  if (!model.value || !confirm('确定要删除这张展示图吗？')) return
+  
+  try {
+    await modelImageApi.delete(model.value.id, image.file_id)
+    showActionMessage('展示图已删除')
+    await fetchImages()
+  } catch (error: any) {
+    showActionMessage(error.response?.data?.message || '删除失败', 'error')
+  }
+}
+
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString('zh-CN')
 }
@@ -182,6 +223,26 @@ function toggleVersions() {
   if (showVersions.value && versions.value.length === 0) {
     fetchVersions()
   }
+}
+
+function prevImage() {
+  if (currentImageIndex.value > 0) {
+    currentImageIndex.value--
+  } else {
+    currentImageIndex.value = images.value.length - 1
+  }
+}
+
+function nextImage() {
+  if (currentImageIndex.value < images.value.length - 1) {
+    currentImageIndex.value++
+  } else {
+    currentImageIndex.value = 0
+  }
+}
+
+function getImageUrl(fileId: string) {
+  return fileApi.getUrl(fileId)
 }
 
 onMounted(fetchModel)
@@ -250,6 +311,67 @@ onMounted(fetchModel)
             无预览图
           </div>
         </div>
+      </Card>
+
+      <Card v-if="hasGalleryImages" class="mb-6">
+        <CardHeader>
+          <CardTitle>展示图</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="relative">
+            <div class="aspect-video w-full bg-muted rounded-md overflow-hidden">
+              <img
+                :src="getImageUrl(images[currentImageIndex]!.file_id)"
+                :alt="`展示图 ${currentImageIndex + 1}`"
+                class="h-full w-full object-contain"
+              />
+            </div>
+            <Button
+              v-if="images.length > 1"
+              variant="outline"
+              size="icon"
+              class="absolute left-2 top-1/2 -translate-y-1/2"
+              @click="prevImage"
+            >
+              <ChevronLeft class="h-4 w-4" />
+            </Button>
+            <Button
+              v-if="images.length > 1"
+              variant="outline"
+              size="icon"
+              class="absolute right-2 top-1/2 -translate-y-1/2"
+              @click="nextImage"
+            >
+              <ChevronRight class="h-4 w-4" />
+            </Button>
+          </div>
+          <div class="mt-4 flex gap-2 overflow-x-auto pb-2">
+            <div
+              v-for="(img, index) in images"
+              :key="img.id"
+              class="relative group flex-shrink-0"
+            >
+              <img
+                :src="getImageUrl(img.file_id)"
+                class="h-16 w-16 rounded-md object-cover cursor-pointer transition-opacity"
+                :class="index === currentImageIndex ? 'ring-2 ring-primary' : 'opacity-60 hover:opacity-100'"
+                @click="currentImageIndex = index"
+              />
+              <Button
+                v-if="isOwner || authStore.isAdmin"
+                variant="destructive"
+                size="icon"
+                class="absolute -right-1 -top-1 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                @click="deleteImage(img)"
+              >
+                <X class="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+          <p class="text-sm text-muted-foreground text-center">
+            {{ currentImageIndex + 1 }} / {{ images.length }}
+          </p>
+        </CardContent>
       </Card>
 
       <div class="mb-6 flex flex-wrap items-center gap-4">

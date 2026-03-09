@@ -24,7 +24,7 @@ function getImageSrc(model: Model): string {
 <template>
   <RouterLink :to="`/model/${model.id}`">
     <Card class="overflow-hidden transition-shadow hover:shadow-lg">
-      <div class="aspect-video w-full bg-muted">
+      <div class="aspect-[4/3] w-full bg-muted">
         <img
           v-if="model.image_id || model.image_url"
           :src="getImageSrc(model)"

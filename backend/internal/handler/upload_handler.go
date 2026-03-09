@@ -54,9 +54,11 @@ func (h *UploadHandler) UploadModel(c *gin.Context) {
 	buf := new(bytes.Buffer)
 	tee := io.TeeReader(file, buf)
 
-	if err := validateZipMagicNumber(tee); err != nil {
-		response.BadRequest(c, "invalid file content: file does not appear to be a valid archive")
-		return
+	if ext == ".zip" {
+		if err := validateZipMagicNumber(tee); err != nil {
+			response.BadRequest(c, "invalid file content: file does not appear to be a valid archive")
+			return
+		}
 	}
 
 	if err := h.storageService.CheckDiskSpace(); err != nil {
@@ -261,6 +263,8 @@ func (h *UploadHandler) ServeModelFile(c *gin.Context) {
 		return
 	}
 
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("X-Content-Type-Options", "nosniff")
 	c.FileAttachment(modelPath, filename)
 }
 

@@ -1,10 +1,15 @@
 package handler
 
 import (
+	"log"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/ysmmc/backend/internal/config"
 	"github.com/ysmmc/backend/internal/middleware"
 	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
@@ -206,4 +211,47 @@ func (h *ModelHandler) CheckFavorite(c *gin.Context) {
 	response.Success(c, gin.H{
 		"is_favorited": h.favoriteService.IsFavorited(userID, id),
 	})
+}
+
+func (h *ModelHandler) ServeModelFile(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid model id")
+		return
+	}
+
+	model, err := h.modelService.GetByID(id)
+	if err != nil {
+		response.NotFound(c, "model not found")
+		return
+	}
+
+	if model.Status != "approved" {
+		response.Forbidden(c, "model is not available for download")
+		return
+	}
+
+	filePath := model.FilePath
+	if strings.HasPrefix(filePath, "/uploads/") {
+		filePath = strings.TrimPrefix(filePath, "/uploads/")
+	}
+
+	fullPath := filepath.Join(config.AppConfig.UploadPath, filePath)
+
+	log.Printf("ServeModelFile: modelID=%s, modelFilePath=%s, fullPath=%s", id, model.FilePath, fullPath)
+
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		response.NotFound(c, "file not found")
+		return
+	}
+
+	fileName := model.Title
+	ext := filepath.Ext(model.FilePath)
+	if ext != "" {
+		fileName = fileName + ext
+	}
+
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.FileAttachment(fullPath, fileName)
 }

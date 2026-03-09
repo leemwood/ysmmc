@@ -49,6 +49,10 @@ type UpdateModelRequest struct {
 }
 
 func (s *ModelService) Create(userID uuid.UUID, req *CreateModelRequest) (*model.Model, error) {
+	if req.ImageID == nil && req.ImageURL == nil {
+		return nil, errors.New("card preview image is required")
+	}
+
 	m := &model.Model{
 		UserID:      userID,
 		Title:       req.Title,
@@ -140,23 +144,58 @@ func (s *ModelService) Delete(modelID, userID uuid.UUID, isAdmin bool) error {
 		return errors.New("unauthorized")
 	}
 
-	// Delete associated favorites first (to avoid foreign key constraint)
+	modelVersionRepo := repository.NewModelVersionRepository()
+	versions, _ := modelVersionRepo.FindByModelID(modelID)
+
+	var fileIDsToDelete []uuid.UUID
+	for _, v := range versions {
+		if v.ImageID != nil {
+			fileIDsToDelete = append(fileIDsToDelete, *v.ImageID)
+		}
+	}
+	if m.ImageID != nil {
+		fileIDsToDelete = append(fileIDsToDelete, *m.ImageID)
+	}
+
+	if err := s.modelRepo.ClearReferences(modelID); err != nil {
+		log.Printf("Delete: error clearing model references: %v", err)
+		return err
+	}
+
+	if err := modelVersionRepo.ClearImageReferences(modelID); err != nil {
+		log.Printf("Delete: error clearing version image references: %v", err)
+	}
+
 	favoriteRepo := repository.NewFavoriteRepository()
 	if err := favoriteRepo.DeleteByModel(modelID); err != nil {
 		log.Printf("Delete: error deleting favorites: %v", err)
 	}
 
-	// Delete associated files
-	if err := deleteModelFiles(m); err != nil {
-		log.Printf("Delete: error deleting files: %v", err)
+	modelImageRepo := repository.NewModelImageRepository()
+	if err := modelImageRepo.DeleteByModelID(modelID); err != nil {
+		log.Printf("Delete: error deleting model images: %v", err)
 	}
 
-	// Delete associated image from database if exists
-	if m.ImageID != nil {
-		fileService := NewFileService()
-		if err := fileService.DeleteFile(*m.ImageID); err != nil {
-			log.Printf("Delete: error deleting image file from database: %v", err)
+	for _, v := range versions {
+		if v.FilePath != "" {
+			os.Remove(v.FilePath)
 		}
+	}
+
+	if err := modelVersionRepo.DeleteByModelID(modelID); err != nil {
+		log.Printf("Delete: error deleting model versions: %v", err)
+		return err
+	}
+
+	fileService := NewFileService()
+	for _, fileID := range fileIDsToDelete {
+		if err := fileService.DeleteFile(fileID); err != nil {
+			log.Printf("Delete: error deleting file %s: %v", fileID, err)
+		}
+	}
+
+	if err := deleteModelFiles(m); err != nil {
+		log.Printf("Delete: error deleting files: %v", err)
 	}
 
 	return s.modelRepo.Delete(modelID)
@@ -276,4 +315,12 @@ func (s *ModelService) CountByStatus(status string) (int64, error) {
 
 func (s *ModelService) SumDownloads() (int64, error) {
 	return s.modelRepo.SumDownloads()
+}
+
+func (s *ModelService) ListAll(page, pageSize int, status, search string) ([]model.Model, int64, error) {
+	return s.modelRepo.ListAll(page, pageSize, status, search)
+}
+
+func (s *ModelService) DeleteByAdmin(modelID uuid.UUID) error {
+	return s.modelRepo.Delete(modelID)
 }

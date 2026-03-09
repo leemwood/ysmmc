@@ -35,6 +35,7 @@ type Model struct {
 	User           *User          `json:"user,omitempty" gorm:"foreignKey:UserID"`
 	CurrentVersion *ModelVersion  `json:"current_version,omitempty" gorm:"foreignKey:CurrentVersionID"`
 	Versions       []ModelVersion `json:"versions,omitempty" gorm:"foreignKey:ModelID"`
+	Images         []ModelImage   `json:"images,omitempty" gorm:"foreignKey:ModelID"`
 }
 
 type ModelPendingChanges struct {

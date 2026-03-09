@@ -33,6 +33,13 @@ func (r *ModelRepository) Delete(id uuid.UUID) error {
 	return database.DB.Delete(&model.Model{}, "id = ?", id).Error
 }
 
+func (r *ModelRepository) ClearReferences(id uuid.UUID) error {
+	return database.DB.Model(&model.Model{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"current_version_id": nil,
+		"image_id":           nil,
+	}).Error
+}
+
 func (r *ModelRepository) ListPublic(page, pageSize int, search string) ([]model.Model, int64, error) {
 	var models []model.Model
 	var total int64
@@ -106,4 +113,25 @@ func (r *ModelRepository) SumDownloads() (int64, error) {
 	var total int64
 	err := database.DB.Model(&model.Model{}).Select("COALESCE(SUM(downloads), 0)").Scan(&total).Error
 	return total, err
+}
+
+func (r *ModelRepository) ListAll(page, pageSize int, status, search string) ([]model.Model, int64, error) {
+	var models []model.Model
+	var total int64
+
+	query := database.DB.Model(&model.Model{})
+
+	if status != "" && status != "all" {
+		query = query.Where("status = ?", status)
+	}
+
+	if search != "" {
+		query = query.Where("title ILIKE ?", "%"+search+"%")
+	}
+
+	query.Count(&total)
+
+	offset := (page - 1) * pageSize
+	err := query.Preload("User").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&models).Error
+	return models, total, err
 }

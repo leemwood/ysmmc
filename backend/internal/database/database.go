@@ -46,6 +46,7 @@ func Migrate() error {
 		&model.User{},
 		&model.Model{},
 		&model.ModelVersion{},
+		&model.ModelImage{},
 		&model.Favorite{},
 		&model.Announcement{},
 		&model.Session{},

@@ -39,6 +39,43 @@ func (h *AdminHandler) ListPendingModels(c *gin.Context) {
 	response.Paginated(c, models, total, page, pageSize)
 }
 
+func (h *AdminHandler) ListAllModels(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	status := c.Query("status")
+	search := c.Query("search")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+
+	models, total, err := h.modelService.ListAll(page, pageSize, status, search)
+	if err != nil {
+		response.InternalError(c, "failed to fetch models")
+		return
+	}
+
+	response.Paginated(c, models, total, page, pageSize)
+}
+
+func (h *AdminHandler) DeleteModel(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid model id")
+		return
+	}
+
+	if err := h.modelService.DeleteByAdmin(id); err != nil {
+		response.InternalError(c, "failed to delete model")
+		return
+	}
+
+	response.SuccessWithMessage(c, "model deleted successfully", nil)
+}
+
 func (h *AdminHandler) ListPendingUpdates(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))

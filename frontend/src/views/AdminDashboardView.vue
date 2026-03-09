@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { LayoutDashboard, Package, Users, Download, Check, X, Loader2, FileText } from 'lucide-vue-next'
+import { LayoutDashboard, Package, Users, Download, Check, X, Loader2, FileText, Megaphone } from 'lucide-vue-next'
 import { getAvatarUrl, getModelImageUrl } from '@/utils/image'
 
 const activeTab = ref('overview')
@@ -182,6 +182,20 @@ onMounted(async () => {
       >
         <Users class="h-4 w-4" />
         用户管理
+      </RouterLink>
+      <RouterLink
+        to="/admin/models"
+        class="flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <Package class="h-4 w-4" />
+        模型管理
+      </RouterLink>
+      <RouterLink
+        to="/admin/announcements"
+        class="flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <Megaphone class="h-4 w-4" />
+        公告管理
       </RouterLink>
     </div>
 

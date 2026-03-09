@@ -102,6 +102,14 @@ func (r *ModelVersionRepository) CountByModelID(modelID uuid.UUID) (int64, error
 	return count, err
 }
 
+func (r *ModelVersionRepository) DeleteByModelID(modelID uuid.UUID) error {
+	return database.DB.Where("model_id = ?", modelID).Delete(&model.ModelVersion{}).Error
+}
+
+func (r *ModelVersionRepository) ClearImageReferences(modelID uuid.UUID) error {
+	return database.DB.Model(&model.ModelVersion{}).Where("model_id = ?", modelID).Update("image_id", nil).Error
+}
+
 func (r *ModelVersionRepository) ExistsByVersion(modelID uuid.UUID, versionNumber string) (bool, error) {
 	var count int64
 	err := database.DB.Model(&model.ModelVersion{}).Where("model_id = ? AND version_number = ?", modelID, versionNumber).Count(&count).Error

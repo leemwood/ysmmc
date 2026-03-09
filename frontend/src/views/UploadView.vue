@@ -1,29 +1,33 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { modelApi, uploadApi } from '@/lib/api'
+import { modelApi, uploadApi, modelImageApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Upload, X, Loader2 } from 'lucide-vue-next'
+import { Upload, X, Loader2, GripVertical, ImageIcon } from 'lucide-vue-next'
 
 const router = useRouter()
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const MAX_GALLERY_IMAGES = 10
 
 const title = ref('')
 const description = ref('')
 const tags = ref('')
 const isPublic = ref(true)
 const file = ref<File | null>(null)
-const imageFile = ref<File | null>(null)
-const imagePreview = ref('')
+const cardImageFile = ref<File | null>(null)
+const cardImagePreview = ref('')
+const galleryFiles = ref<{ file: File; preview: string; id: string }[]>([])
 const loading = ref(false)
 const error = ref('')
 const uploadProgress = ref(0)
+
+const canAddGalleryImage = computed(() => galleryFiles.value.length < MAX_GALLERY_IMAGES)
 
 function handleFileChange(e: Event) {
   const target = e.target as HTMLInputElement
@@ -40,7 +44,7 @@ function handleFileChange(e: Event) {
   }
 }
 
-function handleImageChange(e: Event) {
+function handleCardImageChange(e: Event) {
   const target = e.target as HTMLInputElement
   if (target.files && target.files[0]) {
     const selectedFile = target.files[0]
@@ -55,19 +59,63 @@ function handleImageChange(e: Event) {
       return
     }
     
-    imageFile.value = selectedFile
+    cardImageFile.value = selectedFile
     const reader = new FileReader()
     reader.onload = (e) => {
-      imagePreview.value = e.target?.result as string
+      cardImagePreview.value = e.target?.result as string
     }
-    reader.readAsDataURL(imageFile.value)
+    reader.readAsDataURL(cardImageFile.value)
     error.value = ''
   }
 }
 
-function removeImage() {
-  imageFile.value = null
-  imagePreview.value = ''
+function removeCardImage() {
+  cardImageFile.value = null
+  cardImagePreview.value = ''
+}
+
+function handleGalleryImagesChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  if (target.files) {
+    const remainingSlots = MAX_GALLERY_IMAGES - galleryFiles.value.length
+    const filesToAdd = Array.from(target.files).slice(0, remainingSlots)
+    
+    for (const selectedFile of filesToAdd) {
+      if (selectedFile.size > MAX_IMAGE_SIZE) {
+        error.value = `图片 ${selectedFile.name} 大小超过5MB，已跳过`
+        continue
+      }
+      
+      if (!selectedFile.type.startsWith('image/')) {
+        error.value = `文件 ${selectedFile.name} 不是有效的图片，已跳过`
+        continue
+      }
+      
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        galleryFiles.value.push({
+          file: selectedFile,
+          preview: e.target?.result as string,
+          id: crypto.randomUUID()
+        })
+      }
+      reader.readAsDataURL(selectedFile)
+    }
+    
+    error.value = ''
+  }
+}
+
+function removeGalleryImage(id: string) {
+  galleryFiles.value = galleryFiles.value.filter(img => img.id !== id)
+}
+
+function moveGalleryImage(fromIndex: number, toIndex: number) {
+  if (toIndex < 0 || toIndex >= galleryFiles.value.length) return
+  const items = galleryFiles.value.splice(fromIndex, 1)
+  if (items.length > 0) {
+    galleryFiles.value.splice(toIndex, 0, items[0]!)
+  }
 }
 
 function formatFileSize(bytes: number): string {
@@ -89,31 +137,53 @@ async function handleSubmit() {
     return
   }
 
+  if (!cardImageFile.value) {
+    error.value = '请上传卡片预览图'
+    return
+  }
+
   loading.value = true
   uploadProgress.value = 0
 
   try {
-    uploadProgress.value = 30
+    uploadProgress.value = 10
     const modelUpload = await uploadApi.uploadModel(file.value)
     const modelData = modelUpload.data.data!
 
-    uploadProgress.value = 60
-    let imageId: string | undefined
-    if (imageFile.value) {
-      const imageUpload = await uploadApi.uploadImage(imageFile.value)
-      imageId = imageUpload.data.data?.file_id
+    uploadProgress.value = 30
+    let cardImageId: string | undefined
+    if (cardImageFile.value) {
+      const imageUpload = await uploadApi.uploadImage(cardImageFile.value)
+      cardImageId = imageUpload.data.data?.file_id
     }
 
-    uploadProgress.value = 80
-    await modelApi.create({
+    uploadProgress.value = 50
+    const modelResponse = await modelApi.create({
       title: title.value,
       description: description.value,
       file_path: modelData.file_path,
       file_size: modelData.file_size,
-      image_id: imageId,
+      image_id: cardImageId,
       tags: tags.value.split(',').map(t => t.trim()).filter(Boolean),
       is_public: isPublic.value,
     })
+    const modelId = modelResponse.data.data!.id
+
+    if (galleryFiles.value.length > 0) {
+      uploadProgress.value = 60
+      const totalGallery = galleryFiles.value.length
+      for (let i = 0; i < totalGallery; i++) {
+        const galleryItem = galleryFiles.value[i]
+        if (galleryItem) {
+          const galleryUpload = await uploadApi.uploadImage(galleryItem.file)
+          const galleryImageId = galleryUpload.data.data?.file_id
+          if (galleryImageId) {
+            await modelImageApi.add(modelId, galleryImageId)
+          }
+        }
+        uploadProgress.value = 60 + Math.floor((i + 1) / totalGallery * 30)
+      }
+    }
 
     uploadProgress.value = 100
     router.push('/profile')
@@ -180,21 +250,75 @@ async function handleSubmit() {
           </div>
 
           <div class="space-y-2">
-            <Label>预览图</Label>
-            <p class="text-sm text-muted-foreground">支持 jpg, png, gif 格式，最大 5MB</p>
-            <div v-if="imagePreview" class="relative inline-block">
-              <img :src="imagePreview" class="h-40 w-auto rounded-md object-cover" />
+            <Label>卡片预览图 * (建议 4:3 比例)</Label>
+            <p class="text-sm text-muted-foreground">
+              用于模型卡片展示，建议使用 4:3 比例的图片，支持 jpg, png, gif 格式，最大 5MB
+            </p>
+            <div v-if="cardImagePreview" class="relative inline-block">
+              <img :src="cardImagePreview" class="aspect-[4/3] w-64 rounded-md object-cover" />
               <Button
                 type="button"
                 variant="destructive"
                 size="icon"
                 class="absolute right-2 top-2 h-6 w-6"
-                @click="removeImage"
+                @click="removeCardImage"
               >
                 <X class="h-4 w-4" />
               </Button>
             </div>
-            <Input v-else type="file" accept="image/*" @change="handleImageChange" />
+            <Input v-else type="file" accept="image/*" @change="handleCardImageChange" />
+          </div>
+
+          <div class="space-y-2">
+            <Label>展示图 (可选，最多 {{ MAX_GALLERY_IMAGES }} 张)</Label>
+            <p class="text-sm text-muted-foreground">
+              用于模型详情页展示，支持 jpg, png, gif 格式，最大 5MB
+            </p>
+            
+            <div v-if="galleryFiles.length > 0" class="grid grid-cols-5 gap-2 mb-2">
+              <div
+                v-for="(img, index) in galleryFiles"
+                :key="img.id"
+                class="relative group"
+              >
+                <img :src="img.preview" class="aspect-square w-full rounded-md object-cover" />
+                <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center gap-1">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    class="h-6 w-6"
+                    :disabled="index === 0"
+                    @click="moveGalleryImage(index, index - 1)"
+                  >
+                    <GripVertical class="h-3 w-3" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    class="h-6 w-6"
+                    @click="removeGalleryImage(img.id)"
+                  >
+                    <X class="h-3 w-3" />
+                  </Button>
+                </div>
+                <span class="absolute bottom-1 left-1 bg-black/70 text-white text-xs px-1 rounded">
+                  {{ index + 1 }}
+                </span>
+              </div>
+            </div>
+            
+            <div v-if="canAddGalleryImage" class="flex items-center gap-2">
+              <label class="flex-1 cursor-pointer">
+                <div class="border-2 border-dashed border-muted-foreground/25 rounded-md p-4 text-center hover:border-primary transition-colors">
+                  <ImageIcon class="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                  <p class="text-sm text-muted-foreground">点击添加展示图</p>
+                  <p class="text-xs text-muted-foreground">还可添加 {{ MAX_GALLERY_IMAGES - galleryFiles.length }} 张</p>
+                </div>
+                <Input type="file" accept="image/*" multiple class="hidden" @change="handleGalleryImagesChange" />
+              </label>
+            </div>
           </div>
 
           <div class="flex items-center gap-2">

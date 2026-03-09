@@ -44,6 +44,7 @@ export interface Model {
   user?: User
   current_version?: ModelVersion
   versions?: ModelVersion[]
+  images?: ModelImage[]
 }
 
 export interface ModelPendingChanges {
@@ -71,6 +72,15 @@ export interface ModelVersion {
   created_at: string
   updated_at: string
   model?: Model
+}
+
+export interface ModelImage {
+  id: string
+  model_id: string
+  file_id: string
+  sort_order: number
+  created_at: string
+  file?: FileData
 }
 
 export interface FileData {
