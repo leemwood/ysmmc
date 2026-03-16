@@ -249,14 +249,14 @@ onMounted(fetchModel)
 </script>
 
 <template>
-  <div class="mx-auto max-w-4xl px-4 py-8">
-    <Button variant="ghost" size="sm" class="mb-4" @click="router.back()">
+  <div class="mx-auto max-w-4xl px-4 py-6 sm:py-8">
+    <Button variant="ghost" size="sm" class="mb-4 btn-press" @click="router.back()">
       <ArrowLeft class="mr-2 h-4 w-4" />
       返回
     </Button>
 
     <div v-if="actionMessage" 
-      class="mb-4 rounded-md p-3 text-sm"
+      class="mb-4 rounded-md p-3 text-sm animate-fade-in"
       :class="actionMessageType === 'success' ? 'bg-green-500/10 text-green-600' : 'bg-destructive/10 text-destructive'">
       {{ actionMessage }}
     </div>
@@ -268,11 +268,11 @@ onMounted(fetchModel)
     </div>
 
     <template v-else-if="model">
-      <div class="mb-6 flex items-start justify-between">
-        <div>
-          <h1 class="text-3xl font-bold">{{ model.title }}</h1>
-          <div class="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-            <RouterLink :to="`/user/${model.user?.id}`" class="flex items-center gap-2 hover:text-foreground">
+      <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <h1 class="text-2xl sm:text-3xl font-bold truncate">{{ model.title }}</h1>
+          <div class="mt-2 flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-muted-foreground">
+            <RouterLink :to="`/user/${model.user?.id}`" class="flex items-center gap-2 hover:text-foreground transition-colors">
               <Avatar class="h-6 w-6">
                 <AvatarImage :src="getAvatarUrl(model.user?.avatar_id, model.user?.avatar_url) || undefined">
                   <User class="h-3 w-3" />
@@ -287,19 +287,19 @@ onMounted(fetchModel)
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <Button v-if="isOwner || authStore.isAdmin" variant="outline" size="sm" @click="router.push(`/model/${model.id}/edit`)">
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <Button v-if="isOwner || authStore.isAdmin" variant="outline" size="sm" class="btn-press" @click="router.push(`/model/${model.id}/edit`)">
             <Edit class="mr-2 h-4 w-4" />
             编辑
           </Button>
-          <Button v-if="isOwner || authStore.isAdmin" variant="destructive" size="sm" @click="handleDelete">
+          <Button v-if="isOwner || authStore.isAdmin" variant="destructive" size="sm" class="btn-press" @click="handleDelete">
             <Trash2 class="mr-2 h-4 w-4" />
             删除
           </Button>
         </div>
       </div>
 
-      <Card class="mb-6">
+      <Card class="mb-6 overflow-hidden">
         <div class="aspect-video w-full bg-muted">
           <img
             v-if="model.image_id || model.image_url"
@@ -315,7 +315,7 @@ onMounted(fetchModel)
 
       <Card v-if="hasGalleryImages" class="mb-6">
         <CardHeader>
-          <CardTitle>展示图</CardTitle>
+          <CardTitle class="text-lg">展示图</CardTitle>
         </CardHeader>
         <CardContent>
           <div class="relative">
@@ -330,7 +330,7 @@ onMounted(fetchModel)
               v-if="images.length > 1"
               variant="outline"
               size="icon"
-              class="absolute left-2 top-1/2 -translate-y-1/2"
+              class="absolute left-2 top-1/2 -translate-y-1/2 btn-press"
               @click="prevImage"
             >
               <ChevronLeft class="h-4 w-4" />
@@ -339,13 +339,13 @@ onMounted(fetchModel)
               v-if="images.length > 1"
               variant="outline"
               size="icon"
-              class="absolute right-2 top-1/2 -translate-y-1/2"
+              class="absolute right-2 top-1/2 -translate-y-1/2 btn-press"
               @click="nextImage"
             >
               <ChevronRight class="h-4 w-4" />
             </Button>
           </div>
-          <div class="mt-4 flex gap-2 overflow-x-auto pb-2">
+          <div class="mt-4 flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
             <div
               v-for="(img, index) in images"
               :key="img.id"
@@ -353,7 +353,7 @@ onMounted(fetchModel)
             >
               <img
                 :src="getImageUrl(img.file_id)"
-                class="h-16 w-16 rounded-md object-cover cursor-pointer transition-opacity"
+                class="h-14 w-14 sm:h-16 sm:w-16 rounded-md object-cover cursor-pointer transition-all"
                 :class="index === currentImageIndex ? 'ring-2 ring-primary' : 'opacity-60 hover:opacity-100'"
                 @click="currentImageIndex = index"
               />
@@ -368,33 +368,31 @@ onMounted(fetchModel)
               </Button>
             </div>
           </div>
-          <p class="text-sm text-muted-foreground text-center">
+          <p class="text-sm text-muted-foreground text-center mt-2">
             {{ currentImageIndex + 1 }} / {{ images.length }}
           </p>
         </CardContent>
       </Card>
 
-      <div class="mb-6 flex flex-wrap items-center gap-4">
-        <Button @click="handleDownload">
+      <div class="mb-6 flex flex-wrap items-center gap-3">
+        <Button @click="handleDownload" class="btn-press">
           <Download class="mr-2 h-4 w-4" />
           下载 ({{ model.downloads }})
         </Button>
         <Button
           :variant="isFavorited ? 'default' : 'outline'"
           @click="toggleFavorite"
+          class="btn-press"
         >
           <Heart class="mr-2 h-4 w-4" :class="{ 'fill-current': isFavorited }" />
           {{ isFavorited ? '已收藏' : '收藏' }} ({{ favoriteCount }})
         </Button>
-        <span class="text-sm text-muted-foreground">
-          文件大小: {{ formatFileSize(model.file_size) }}
-        </span>
-        <span v-if="model.current_version" class="text-sm text-muted-foreground">
-          当前版本: {{ model.current_version.version_number }}
-        </span>
-        <span v-if="model.version_count > 1" class="text-sm text-muted-foreground">
-          共 {{ model.version_count }} 个版本
-        </span>
+      </div>
+      
+      <div class="mb-6 flex flex-wrap gap-3 text-sm text-muted-foreground">
+        <span>文件大小: {{ formatFileSize(model.file_size) }}</span>
+        <span v-if="model.current_version">当前版本: {{ model.current_version.version_number }}</span>
+        <span v-if="model.version_count > 1">共 {{ model.version_count }} 个版本</span>
       </div>
 
       <div class="mb-6 flex flex-wrap gap-2">
@@ -406,17 +404,17 @@ onMounted(fetchModel)
 
       <Card class="mb-6">
         <CardHeader>
-          <CardTitle>描述</CardTitle>
+          <CardTitle class="text-lg">描述</CardTitle>
         </CardHeader>
         <CardContent>
-          <p class="whitespace-pre-wrap">{{ model.description || '暂无描述' }}</p>
+          <p class="whitespace-pre-wrap text-sm sm:text-base">{{ model.description || '暂无描述' }}</p>
         </CardContent>
       </Card>
 
       <Card class="mb-6">
         <CardHeader class="cursor-pointer" @click="toggleVersions">
           <div class="flex items-center justify-between">
-            <CardTitle class="flex items-center gap-2">
+            <CardTitle class="flex items-center gap-2 text-lg">
               <History class="h-5 w-5" />
               版本历史
             </CardTitle>
@@ -425,12 +423,17 @@ onMounted(fetchModel)
                 v-if="isOwner || authStore.isAdmin"
                 variant="outline"
                 size="sm"
+                class="btn-press"
                 @click.stop="router.push(`/model/${model.id}/versions/new`)"
               >
                 <Plus class="mr-1 h-4 w-4" />
                 新版本
               </Button>
-              <span class="text-sm text-muted-foreground">{{ showVersions ? '收起' : '展开' }}</span>
+              <span class="text-sm text-muted-foreground hidden sm:inline">{{ showVersions ? '收起' : '展开' }}</span>
+              <ChevronLeft 
+                class="h-4 w-4 text-muted-foreground transition-transform sm:hidden" 
+                :class="{ '-rotate-90': showVersions, 'rotate-90': !showVersions }" 
+              />
             </div>
           </div>
         </CardHeader>
@@ -441,15 +444,15 @@ onMounted(fetchModel)
           <div v-else-if="versions.length === 0" class="py-4 text-center text-muted-foreground">
             暂无版本记录
           </div>
-          <div v-else class="space-y-4">
+          <div v-else class="space-y-3">
             <div
               v-for="version in versions"
               :key="version.id"
-              class="rounded-lg border p-4"
+              class="rounded-lg border p-3 sm:p-4"
               :class="{ 'border-primary bg-primary/5': version.is_current }"
             >
-              <div class="flex items-start justify-between">
-                <div class="flex-1">
+              <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="font-semibold">{{ version.version_number }}</span>
                     <Badge v-if="version.is_current" variant="default" class="text-xs">
@@ -459,7 +462,7 @@ onMounted(fetchModel)
                   <p v-if="version.description" class="mt-1 text-sm text-muted-foreground">
                     {{ version.description }}
                   </p>
-                  <div class="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+                  <div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <span>{{ formatDate(version.created_at) }}</span>
                     <span>{{ formatFileSize(version.file_size) }}</span>
                     <span>{{ version.downloads }} 次下载</span>
@@ -468,8 +471,8 @@ onMounted(fetchModel)
                     {{ version.changelog }}
                   </p>
                 </div>
-                <div class="flex items-center gap-2">
-                  <Button variant="outline" size="sm" @click="handleVersionDownload(version)">
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <Button variant="outline" size="sm" class="btn-press" @click="handleVersionDownload(version)">
                     <Download class="mr-1 h-3 w-3" />
                     下载
                   </Button>
@@ -477,6 +480,7 @@ onMounted(fetchModel)
                     v-if="!version.is_current && (isOwner || authStore.isAdmin)"
                     variant="outline"
                     size="sm"
+                    class="btn-press hidden sm:inline-flex"
                     @click="setCurrentVersion(version)"
                   >
                     <Check class="mr-1 h-3 w-3" />
@@ -486,6 +490,7 @@ onMounted(fetchModel)
                     v-if="!version.is_current && (isOwner || authStore.isAdmin)"
                     variant="destructive"
                     size="sm"
+                    class="btn-press"
                     @click="deleteVersion(version)"
                   >
                     <Trash2 class="h-3 w-3" />
@@ -499,7 +504,7 @@ onMounted(fetchModel)
 
       <Card v-if="model.status === 'rejected'" class="mt-6 border-destructive">
         <CardHeader>
-          <CardTitle class="text-destructive">审核未通过</CardTitle>
+          <CardTitle class="text-destructive text-lg">审核未通过</CardTitle>
         </CardHeader>
         <CardContent>
           <p>{{ model.rejection_reason || '未提供原因' }}</p>

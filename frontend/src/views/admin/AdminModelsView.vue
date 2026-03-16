@@ -140,36 +140,35 @@ onMounted(fetchModels)
 </script>
 
 <template>
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">模型管理</h1>
+  <div class="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+    <h1 class="mb-4 sm:mb-6 text-xl sm:text-2xl font-bold">模型管理</h1>
 
-    <div class="flex flex-wrap gap-4 mb-6">
-      <div class="flex-1 min-w-[200px]">
-        <div class="relative">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            v-model="search"
-            placeholder="搜索模型..."
-            class="pl-10"
-            @keyup.enter="handleSearch"
-          />
-        </div>
+    <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
+      <div class="relative flex-1">
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          v-model="search"
+          placeholder="搜索模型..."
+          class="pl-10"
+          @keyup.enter="handleSearch"
+        />
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
         <Button
           v-for="option in statusOptions"
           :key="option.value"
           :variant="statusFilter === option.value ? 'default' : 'outline'"
           size="sm"
+          class="btn-press whitespace-nowrap"
           @click="handleStatusChange(option.value)"
         >
           {{ option.label }}
         </Button>
       </div>
-      <Button @click="handleSearch">搜索</Button>
+      <Button class="btn-press" @click="handleSearch">搜索</Button>
     </div>
 
-    <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div v-if="loading" class="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       <Card v-for="i in 8" :key="i">
         <CardContent class="p-4">
           <Skeleton class="aspect-[4/3] w-full mb-3" />
@@ -183,8 +182,8 @@ onMounted(fetchModels)
       暂无模型数据
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      <Card v-for="m in models" :key="m.id" class="overflow-hidden">
+    <div v-else class="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <Card v-for="m in models" :key="m.id" class="overflow-hidden card-hover">
         <div class="aspect-[4/3] w-full bg-muted">
           <img
             v-if="m.image_id || m.image_url"
@@ -196,27 +195,27 @@ onMounted(fetchModels)
             无预览图
           </div>
         </div>
-        <CardContent class="p-4">
+        <CardContent class="p-3 sm:p-4">
           <div class="flex items-start justify-between gap-2">
-            <h3 class="font-semibold line-clamp-1">{{ m.title }}</h3>
-            <Badge :variant="getStatusBadgeVariant(m.status)">
+            <h3 class="font-semibold line-clamp-1 text-sm sm:text-base">{{ m.title }}</h3>
+            <Badge :variant="getStatusBadgeVariant(m.status)" class="text-xs flex-shrink-0">
               {{ getStatusLabel(m.status) }}
             </Badge>
           </div>
-          <p class="mt-1 text-sm text-muted-foreground line-clamp-2">
+          <p class="mt-1 text-xs sm:text-sm text-muted-foreground line-clamp-2">
             {{ m.description || '暂无描述' }}
           </p>
           <div class="mt-2 text-xs text-muted-foreground">
             <span>作者: {{ m.user?.username || '未知' }}</span>
-            <span class="mx-2">|</span>
-            <span>{{ formatDate(m.created_at) }}</span>
+            <span class="mx-2 hidden sm:inline">|</span>
+            <span class="hidden sm:inline">{{ formatDate(m.created_at) }}</span>
           </div>
           <div class="mt-3 flex gap-2">
-            <Button variant="outline" size="sm" @click="viewModel(m.id)">
+            <Button variant="outline" size="sm" class="btn-press flex-1" @click="viewModel(m.id)">
               <Eye class="mr-1 h-3 w-3" />
               查看
             </Button>
-            <Button variant="destructive" size="sm" @click="confirmDelete(m)">
+            <Button variant="destructive" size="sm" class="btn-press flex-1" @click="confirmDelete(m)">
               <Trash2 class="mr-1 h-3 w-3" />
               删除
             </Button>
@@ -225,17 +224,18 @@ onMounted(fetchModels)
       </Card>
     </div>
 
-    <div v-if="totalPages > 1" class="mt-6 flex items-center justify-center gap-4">
-      <Button variant="outline" size="sm" :disabled="page === 1" @click="prevPage">
-        <ChevronLeft class="h-4 w-4" />
-        上一页
+    <div v-if="totalPages > 1" class="mt-4 sm:mt-6 flex items-center justify-center gap-2 sm:gap-4">
+      <Button variant="outline" size="sm" class="btn-press" :disabled="page === 1" @click="prevPage">
+        <ChevronLeft class="h-4 w-4 sm:mr-1" />
+        <span class="hidden sm:inline">上一页</span>
       </Button>
       <span class="text-sm text-muted-foreground">
-        第 {{ page }} / {{ totalPages }} 页，共 {{ total }} 条
+        <span class="hidden sm:inline">第 {{ page }} / {{ totalPages }} 页，共 {{ total }} 条</span>
+        <span class="sm:hidden">{{ page }} / {{ totalPages }}</span>
       </span>
-      <Button variant="outline" size="sm" :disabled="page === totalPages" @click="nextPage">
-        下一页
-        <ChevronRight class="h-4 w-4" />
+      <Button variant="outline" size="sm" class="btn-press" :disabled="page === totalPages" @click="nextPage">
+        <span class="hidden sm:inline">下一页</span>
+        <ChevronRight class="h-4 w-4 sm:ml-1" />
       </Button>
     </div>
 

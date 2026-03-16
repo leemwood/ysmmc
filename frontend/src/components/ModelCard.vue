@@ -22,21 +22,21 @@ function getImageSrc(model: Model): string {
 </script>
 
 <template>
-  <RouterLink :to="`/model/${model.id}`">
-    <Card class="overflow-hidden transition-shadow hover:shadow-lg">
-      <div class="aspect-[4/3] w-full bg-muted">
+  <RouterLink :to="`/model/${model.id}`" class="block">
+    <Card class="overflow-hidden card-hover group">
+      <div class="aspect-[4/3] w-full bg-muted overflow-hidden">
         <img
           v-if="model.image_id || model.image_url"
           :src="getImageSrc(model)"
           :alt="model.title"
-          class="h-full w-full object-cover"
+          class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div v-else class="flex h-full items-center justify-center text-muted-foreground">
           无预览图
         </div>
       </div>
       <CardContent class="p-4">
-        <h3 class="font-semibold line-clamp-1">{{ model.title }}</h3>
+        <h3 class="font-semibold line-clamp-1 group-hover:text-primary transition-colors">{{ model.title }}</h3>
         <p class="mt-1 text-sm text-muted-foreground line-clamp-2">
           {{ model.description || '暂无描述' }}
         </p>

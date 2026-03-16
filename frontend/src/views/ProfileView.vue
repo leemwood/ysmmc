@@ -231,31 +231,34 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-4xl px-4 py-8">
-    <div class="mb-6 flex gap-4 border-b">
+  <div class="mx-auto max-w-4xl px-4 py-6 sm:py-8">
+    <div class="mb-6 flex gap-1 sm:gap-4 border-b overflow-x-auto">
       <button
-        class="flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+        class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0"
         :class="activeTab === 'profile' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
         @click="activeTab = 'profile'"
       >
         <User class="h-4 w-4" />
-        个人资料
+        <span class="hidden sm:inline">个人资料</span>
+        <span class="sm:hidden">资料</span>
       </button>
       <button
-        class="flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+        class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0"
         :class="activeTab === 'models' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
         @click="activeTab = 'models'"
       >
         <Package class="h-4 w-4" />
-        我的模型
+        <span class="hidden sm:inline">我的模型</span>
+        <span class="sm:hidden">模型</span>
       </button>
       <button
-        class="flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+        class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0"
         :class="activeTab === 'favorites' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
         @click="activeTab = 'favorites'"
       >
         <Heart class="h-4 w-4" />
-        我的收藏
+        <span class="hidden sm:inline">我的收藏</span>
+        <span class="sm:hidden">收藏</span>
       </button>
     </div>
 
@@ -266,15 +269,15 @@ onMounted(() => {
         </CardHeader>
         <CardContent>
           <form @submit.prevent="handleUpdateProfile" class="space-y-4">
-            <div v-if="message" class="rounded-md bg-primary/10 p-3 text-sm text-primary">
+            <div v-if="message" class="rounded-md bg-primary/10 p-3 text-sm text-primary animate-fade-in">
               {{ message }}
             </div>
 
-            <div class="flex items-start gap-6">
-              <div class="relative group">
-                <Avatar class="h-24 w-24">
+            <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+              <div class="relative group self-center sm:self-start">
+                <Avatar class="h-20 w-20 sm:h-24 sm:w-24">
                   <AvatarImage v-if="avatarPreview || authStore.user?.avatar_id || authStore.user?.avatar_url" :src="avatarPreview || getAvatarUrl(authStore.user?.avatar_id, authStore.user?.avatar_url) || undefined">
-                    <User class="h-12 w-12 text-muted-foreground" />
+                    <User class="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground" />
                   </AvatarImage>
                 </Avatar>
                 <label class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
@@ -282,8 +285,8 @@ onMounted(() => {
                   <input type="file" accept="image/*" class="hidden" @change="handleAvatarChange" />
                 </label>
               </div>
-              <div class="flex-1 space-y-3">
-                <div v-if="avatarPreview" class="flex gap-2">
+              <div class="flex-1 space-y-3 text-center sm:text-left">
+                <div v-if="avatarPreview" class="flex gap-2 justify-center sm:justify-start">
                   <Button size="sm" @click="uploadAvatar" :disabled="uploadingAvatar">
                     <Loader2 v-if="uploadingAvatar" class="mr-2 h-4 w-4 animate-spin" />
                     保存头像
@@ -296,7 +299,7 @@ onMounted(() => {
               </div>
             </div>
 
-            <div class="flex items-center gap-4 pt-2">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 pt-2">
               <div>
                 <p class="font-medium">{{ authStore.user?.username }}</p>
                 <p class="text-sm text-muted-foreground">{{ authStore.user?.email }}</p>
@@ -322,17 +325,17 @@ onMounted(() => {
               资料修改正在审核中
             </div>
 
-            <div class="flex gap-2">
-              <Button type="submit" :disabled="loading">
+            <div class="flex flex-col sm:flex-row gap-2">
+              <Button type="submit" :disabled="loading" class="btn-press">
                 <Loader2 v-if="loading" class="mr-2 h-4 w-4 animate-spin" />
                 <Save v-else class="mr-2 h-4 w-4" />
                 保存修改
               </Button>
-              <Button type="button" variant="outline" @click="openPasswordDialog">
+              <Button type="button" variant="outline" @click="openPasswordDialog" class="btn-press">
                 <Key class="mr-2 h-4 w-4" />
                 修改密码
               </Button>
-              <Button type="button" variant="outline" @click="openEmailDialog">
+              <Button type="button" variant="outline" @click="openEmailDialog" class="btn-press">
                 <Mail class="mr-2 h-4 w-4" />
                 修改邮箱
               </Button>
@@ -344,13 +347,13 @@ onMounted(() => {
 
     <div v-else-if="activeTab === 'models'">
       <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-xl font-semibold">我的模型</h2>
+        <h2 class="text-lg sm:text-xl font-semibold">我的模型</h2>
         <RouterLink to="/upload">
-          <Button size="sm">上传模型</Button>
+          <Button size="sm" class="btn-press">上传模型</Button>
         </RouterLink>
       </div>
 
-      <div v-if="loadingModels" class="grid gap-4 sm:grid-cols-2">
+      <div v-if="loadingModels" class="grid gap-4 grid-cols-1 sm:grid-cols-2">
         <Skeleton v-for="i in 4" :key="i" class="h-32" />
       </div>
 
@@ -358,11 +361,11 @@ onMounted(() => {
         暂无模型，<RouterLink to="/upload" class="text-primary hover:underline">去上传</RouterLink>
       </div>
 
-      <div v-else class="grid gap-4 sm:grid-cols-2">
-        <Card v-for="model in models" :key="model.id">
+      <div v-else class="grid gap-4 grid-cols-1 sm:grid-cols-2">
+        <Card v-for="model in models" :key="model.id" class="card-hover">
           <CardContent class="p-4">
             <div class="flex items-start gap-4">
-              <div class="h-16 w-16 flex-shrink-0 rounded bg-muted">
+              <div class="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 rounded bg-muted overflow-hidden">
                 <img v-if="model.image_id || model.image_url" :src="getModelImageUrl(model.image_id, model.image_url)" class="h-full w-full object-cover rounded" />
               </div>
               <div class="flex-1 min-w-0">
@@ -370,7 +373,7 @@ onMounted(() => {
                   {{ model.title }}
                 </RouterLink>
                 <div class="mt-1 flex items-center gap-2">
-                  <Badge :variant="model.status === 'approved' ? 'default' : model.status === 'rejected' ? 'destructive' : 'secondary'">
+                  <Badge :variant="model.status === 'approved' ? 'default' : model.status === 'rejected' ? 'destructive' : 'secondary'" class="text-xs">
                     {{ model.status === 'approved' ? '已通过' : model.status === 'rejected' ? '已拒绝' : '审核中' }}
                   </Badge>
                   <span class="text-xs text-muted-foreground">{{ model.downloads }} 下载</span>
@@ -383,9 +386,9 @@ onMounted(() => {
     </div>
 
     <div v-else-if="activeTab === 'favorites'">
-      <h2 class="mb-4 text-xl font-semibold">我的收藏</h2>
+      <h2 class="mb-4 text-lg sm:text-xl font-semibold">我的收藏</h2>
 
-      <div v-if="loadingFavorites" class="grid gap-4 sm:grid-cols-2">
+      <div v-if="loadingFavorites" class="grid gap-4 grid-cols-1 sm:grid-cols-2">
         <Skeleton v-for="i in 4" :key="i" class="h-32" />
       </div>
 
@@ -393,11 +396,11 @@ onMounted(() => {
         暂无收藏
       </div>
 
-      <div v-else class="grid gap-4 sm:grid-cols-2">
-        <Card v-for="favorite in favorites" :key="favorite.id">
+      <div v-else class="grid gap-4 grid-cols-1 sm:grid-cols-2">
+        <Card v-for="favorite in favorites" :key="favorite.id" class="card-hover">
           <CardContent class="p-4">
             <div class="flex items-start gap-4">
-              <div class="h-16 w-16 flex-shrink-0 rounded bg-muted">
+              <div class="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 rounded bg-muted overflow-hidden">
                 <img v-if="favorite.model?.image_id || favorite.model?.image_url" :src="getModelImageUrl(favorite.model?.image_id, favorite.model?.image_url)" class="h-full w-full object-cover rounded" />
               </div>
               <div class="flex-1 min-w-0">

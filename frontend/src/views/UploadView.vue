@@ -197,14 +197,14 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl px-4 py-8">
+  <div class="mx-auto max-w-2xl px-4 py-6 sm:py-8">
     <Card>
       <CardHeader>
-        <CardTitle class="text-2xl">上传模型</CardTitle>
+        <CardTitle class="text-xl sm:text-2xl">上传模型</CardTitle>
       </CardHeader>
       <CardContent>
-        <form @submit.prevent="handleSubmit" class="space-y-6">
-          <div v-if="error" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+        <form @submit.prevent="handleSubmit" class="space-y-5 sm:space-y-6">
+          <div v-if="error" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive animate-fade-in">
             {{ error }}
           </div>
 
@@ -240,54 +240,55 @@ async function handleSubmit() {
               accept=".ysm,.zip"
               @change="handleFileChange"
               required
+              class="text-sm"
             />
-            <p class="text-sm text-muted-foreground">
+            <p class="text-xs sm:text-sm text-muted-foreground">
               支持 .ysm, .zip 格式，最大 100MB
             </p>
-            <p v-if="file" class="text-sm text-primary">
+            <p v-if="file" class="text-xs sm:text-sm text-primary">
               已选择: {{ file.name }} ({{ formatFileSize(file.size) }})
             </p>
           </div>
 
           <div class="space-y-2">
             <Label>卡片预览图 * (建议 4:3 比例)</Label>
-            <p class="text-sm text-muted-foreground">
-              用于模型卡片展示，建议使用 4:3 比例的图片，支持 jpg, png, gif 格式，最大 5MB
+            <p class="text-xs sm:text-sm text-muted-foreground">
+              用于模型卡片展示，建议使用 4:3 比例的图片
             </p>
             <div v-if="cardImagePreview" class="relative inline-block">
-              <img :src="cardImagePreview" class="aspect-[4/3] w-64 rounded-md object-cover" />
+              <img :src="cardImagePreview" class="aspect-[4/3] w-48 sm:w-64 rounded-md object-cover" />
               <Button
                 type="button"
                 variant="destructive"
                 size="icon"
-                class="absolute right-2 top-2 h-6 w-6"
+                class="absolute right-2 top-2 h-6 w-6 sm:h-7 sm:w-7"
                 @click="removeCardImage"
               >
                 <X class="h-4 w-4" />
               </Button>
             </div>
-            <Input v-else type="file" accept="image/*" @change="handleCardImageChange" />
+            <Input v-else type="file" accept="image/*" @change="handleCardImageChange" class="text-sm" />
           </div>
 
           <div class="space-y-2">
             <Label>展示图 (可选，最多 {{ MAX_GALLERY_IMAGES }} 张)</Label>
-            <p class="text-sm text-muted-foreground">
-              用于模型详情页展示，支持 jpg, png, gif 格式，最大 5MB
+            <p class="text-xs sm:text-sm text-muted-foreground">
+              用于模型详情页展示，支持 jpg, png, gif 格式
             </p>
             
-            <div v-if="galleryFiles.length > 0" class="grid grid-cols-5 gap-2 mb-2">
+            <div v-if="galleryFiles.length > 0" class="grid grid-cols-4 sm:grid-cols-5 gap-2 mb-2">
               <div
                 v-for="(img, index) in galleryFiles"
                 :key="img.id"
-                class="relative group"
+                class="relative group aspect-square"
               >
-                <img :src="img.preview" class="aspect-square w-full rounded-md object-cover" />
+                <img :src="img.preview" class="w-full h-full rounded-md object-cover" />
                 <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center gap-1">
                   <Button
                     type="button"
                     variant="secondary"
                     size="icon"
-                    class="h-6 w-6"
+                    class="h-5 w-5 sm:h-6 sm:w-6 hidden sm:flex"
                     :disabled="index === 0"
                     @click="moveGalleryImage(index, index - 1)"
                   >
@@ -297,13 +298,13 @@ async function handleSubmit() {
                     type="button"
                     variant="destructive"
                     size="icon"
-                    class="h-6 w-6"
+                    class="h-5 w-5 sm:h-6 sm:w-6"
                     @click="removeGalleryImage(img.id)"
                   >
                     <X class="h-3 w-3" />
                   </Button>
                 </div>
-                <span class="absolute bottom-1 left-1 bg-black/70 text-white text-xs px-1 rounded">
+                <span class="absolute bottom-1 left-1 bg-black/70 text-white text-[10px] sm:text-xs px-1 rounded">
                   {{ index + 1 }}
                 </span>
               </div>
@@ -311,10 +312,10 @@ async function handleSubmit() {
             
             <div v-if="canAddGalleryImage" class="flex items-center gap-2">
               <label class="flex-1 cursor-pointer">
-                <div class="border-2 border-dashed border-muted-foreground/25 rounded-md p-4 text-center hover:border-primary transition-colors">
-                  <ImageIcon class="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                  <p class="text-sm text-muted-foreground">点击添加展示图</p>
-                  <p class="text-xs text-muted-foreground">还可添加 {{ MAX_GALLERY_IMAGES - galleryFiles.length }} 张</p>
+                <div class="border-2 border-dashed border-muted-foreground/25 rounded-md p-3 sm:p-4 text-center hover:border-primary transition-colors">
+                  <ImageIcon class="mx-auto h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground mb-2" />
+                  <p class="text-xs sm:text-sm text-muted-foreground">点击添加展示图</p>
+                  <p class="text-[10px] sm:text-xs text-muted-foreground">还可添加 {{ MAX_GALLERY_IMAGES - galleryFiles.length }} 张</p>
                 </div>
                 <Input type="file" accept="image/*" multiple class="hidden" @change="handleGalleryImagesChange" />
               </label>
@@ -326,9 +327,9 @@ async function handleSubmit() {
               id="isPublic"
               v-model="isPublic"
               type="checkbox"
-              class="h-4 w-4 rounded border-gray-300"
+              class="h-4 w-4 rounded border-gray-300 accent-primary"
             />
-            <Label for="isPublic">公开显示</Label>
+            <Label for="isPublic" class="cursor-pointer">公开显示</Label>
           </div>
 
           <div v-if="loading && uploadProgress > 0" class="space-y-2">
@@ -344,7 +345,7 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <Button type="submit" class="w-full" :disabled="loading">
+          <Button type="submit" class="w-full btn-press" :disabled="loading">
             <Loader2 v-if="loading" class="mr-2 h-4 w-4 animate-spin" />
             <Upload v-else class="mr-2 h-4 w-4" />
             {{ loading ? '上传中...' : '上传模型' }}
