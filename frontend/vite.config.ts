@@ -148,9 +148,15 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          'ui-vendor': ['radix-vue', 'lucide-vue-next', 'class-variance-authority', 'clsx', 'tailwind-merge'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (['vue', 'vue-router', 'pinia'].some(pkg => id.includes(pkg))) {
+              return 'vue-vendor';
+            }
+            if (['radix-vue', 'lucide-vue-next', 'class-variance-authority', 'clsx', 'tailwind-merge'].some(pkg => id.includes(pkg))) {
+              return 'ui-vendor';
+            }
+          }
         },
       },
     },
