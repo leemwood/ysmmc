@@ -190,4 +190,56 @@ h1, h2, h3, h4, h5, h6 {
   h1 { font-size: 1.75rem; }
   h2 { font-size: 1.5rem; }
   h3 { font-size: 1.25rem; }
+  .text-base { font-size: 0.9375rem; }
+  .text-sm { font-size: 0.8125rem; }
+}
+
+@media (max-width: 480px) {
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.125rem; }
+  .text-base { font-size: 0.875rem; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .card-hover:hover {
+    transform: none;
+  }
+  
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media (hover: none) {
+  .btn-press:active {
+    transform: scale(0.96);
+  }
+  
+  .card-hover:active {
+    transform: scale(0.98);
+  }
+}
+
+[data-state="open"] [role="dialog"] {
+  background-color: hsl(var(--background) / 1) !important;
+}
+
+@media (max-width: 640px) {
+  [role="dialog"] {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: auto !important;
+    max-height: 90vh !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    border-radius: 0.75rem !important;
+    overflow-y: auto !important;
+  }
 }

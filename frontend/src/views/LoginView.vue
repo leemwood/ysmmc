@@ -64,20 +64,20 @@ async function handleSubmit() {
 <template>
   <div class="min-h-[calc(100vh-8rem)] flex items-center justify-center px-4 py-8 sm:py-12 relative overflow-hidden">
     <div class="absolute inset-0 -z-10">
-      <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
-      <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl"></div>
+      <div class="absolute top-1/4 left-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-primary/5 rounded-full blur-3xl"></div>
+      <div class="absolute bottom-1/4 right-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-primary/10 rounded-full blur-3xl"></div>
     </div>
 
-    <Card class="w-full max-w-md animate-slide-up relative">
-      <CardHeader class="text-center space-y-2">
-        <CardTitle class="text-2xl sm:text-3xl">
+    <Card class="w-full max-w-md animate-slide-up relative sm:rounded-xl">
+      <CardHeader class="text-center space-y-2 px-4 py-4 sm:px-6 sm:pt-6">
+        <CardTitle class="text-xl sm:text-2xl lg:text-3xl">
           {{ isLogin ? '欢迎回来' : '创建账号' }}
         </CardTitle>
-        <CardDescription>
+        <CardDescription class="text-xs sm:text-sm">
           {{ isLogin ? '登录您的 YSM 模型站账号' : '注册成为 YSM 模型站用户' }}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent class="px-4 pb-6 sm:px-6">
         <form @submit.prevent="handleSubmit" class="space-y-4">
           <div v-if="error" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive animate-fade-in">
             {{ error }}
@@ -96,6 +96,7 @@ async function handleSubmit() {
               placeholder="请输入邮箱"
               required
               autocomplete="email"
+              class="h-11"
             />
           </div>
 
@@ -108,6 +109,7 @@ async function handleSubmit() {
               placeholder="请输入用户名（至少2个字符）"
               required
               autocomplete="username"
+              class="h-11"
             />
           </div>
 
@@ -120,6 +122,7 @@ async function handleSubmit() {
               placeholder="请输入密码（至少6个字符）"
               required
               autocomplete="current-password"
+              class="h-11"
             />
           </div>
 
@@ -132,10 +135,11 @@ async function handleSubmit() {
               placeholder="请再次输入密码"
               required
               autocomplete="new-password"
+              class="h-11"
             />
           </div>
 
-          <Button type="submit" class="w-full btn-press" :disabled="loading">
+          <Button type="submit" class="w-full btn-press h-11" :disabled="loading">
             <LogIn v-if="isLogin" class="mr-2 h-4 w-4" />
             <UserPlus v-else class="mr-2 h-4 w-4" />
             {{ loading ? '处理中...' : (isLogin ? '登录' : '注册') }}
@@ -144,7 +148,7 @@ async function handleSubmit() {
           <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm">
             <button
               type="button"
-              class="text-primary hover:underline transition-colors"
+              class="text-primary hover:underline transition-colors py-2"
               @click="isLogin = !isLogin"
             >
               {{ isLogin ? '没有账号？去注册' : '已有账号？去登录' }}
@@ -152,7 +156,7 @@ async function handleSubmit() {
             <RouterLink
               v-if="isLogin"
               to="/reset-password"
-              class="text-muted-foreground hover:text-foreground transition-colors"
+              class="text-muted-foreground hover:text-foreground transition-colors py-2"
             >
               忘记密码？
             </RouterLink>

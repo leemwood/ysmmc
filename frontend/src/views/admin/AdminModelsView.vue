@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminApi } from '@/lib/api'
 import type { Model } from '@/types'
+import AdminLayout from '@/components/admin/AdminLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -140,16 +141,14 @@ onMounted(fetchModels)
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl px-4 py-6 sm:py-8">
-    <h1 class="mb-4 sm:mb-6 text-xl sm:text-2xl font-bold">模型管理</h1>
-
+  <AdminLayout title="模型管理" description="管理所有用户上传的模型">
     <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
       <div class="relative flex-1">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           v-model="search"
           placeholder="搜索模型..."
-          class="pl-10"
+          class="pl-10 h-11"
           @keyup.enter="handleSearch"
         />
       </div>
@@ -159,13 +158,13 @@ onMounted(fetchModels)
           :key="option.value"
           :variant="statusFilter === option.value ? 'default' : 'outline'"
           size="sm"
-          class="btn-press whitespace-nowrap"
+          class="btn-press whitespace-nowrap h-9"
           @click="handleStatusChange(option.value)"
         >
           {{ option.label }}
         </Button>
       </div>
-      <Button class="btn-press" @click="handleSearch">搜索</Button>
+      <Button class="btn-press h-9" @click="handleSearch">搜索</Button>
     </div>
 
     <div v-if="loading" class="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -256,5 +255,5 @@ onMounted(fetchModels)
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </AdminLayout>
 </template>

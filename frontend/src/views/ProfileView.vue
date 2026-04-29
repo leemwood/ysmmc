@@ -287,11 +287,11 @@ onMounted(() => {
               </div>
               <div class="flex-1 space-y-3 text-center sm:text-left">
                 <div v-if="avatarPreview" class="flex gap-2 justify-center sm:justify-start">
-                  <Button size="sm" @click="uploadAvatar" :disabled="uploadingAvatar">
+                  <Button size="sm" @click="uploadAvatar" :disabled="uploadingAvatar" class="h-9">
                     <Loader2 v-if="uploadingAvatar" class="mr-2 h-4 w-4 animate-spin" />
                     保存头像
                   </Button>
-                  <Button size="sm" variant="outline" @click="avatarPreview = null; avatarFile = null">
+                  <Button size="sm" variant="outline" @click="avatarPreview = null; avatarFile = null" class="h-9">
                     取消
                   </Button>
                 </div>
@@ -303,7 +303,7 @@ onMounted(() => {
               <div>
                 <p class="font-medium">{{ authStore.user?.username }}</p>
                 <p class="text-sm text-muted-foreground">{{ authStore.user?.email }}</p>
-                <div class="flex items-center gap-2 mt-1">
+                <div class="flex items-center gap-2 mt-1 flex-wrap">
                   <Badge v-if="authStore.user?.role === 'super_admin'" variant="default">站长</Badge>
                   <Badge v-else-if="authStore.isAdmin" variant="secondary">管理员</Badge>
                   <Badge v-if="authStore.user?.email_verified" variant="outline" class="text-green-600">已验证</Badge>
@@ -313,12 +313,12 @@ onMounted(() => {
 
             <div class="space-y-2">
               <Label for="username">用户名</Label>
-              <Input id="username" v-model="username" placeholder="请输入用户名" />
+              <Input id="username" v-model="username" placeholder="请输入用户名" class="h-11" />
             </div>
 
             <div class="space-y-2">
               <Label for="bio">个人简介</Label>
-              <Textarea id="bio" v-model="bio" placeholder="介绍一下自己..." :rows="3" />
+              <Textarea id="bio" v-model="bio" placeholder="介绍一下自己..." :rows="3" class="min-h-[80px]" />
             </div>
 
             <div v-if="authStore.user?.profile_status === 'pending_review'" class="rounded-md bg-yellow-500/10 p-3 text-sm text-yellow-600">
@@ -326,16 +326,16 @@ onMounted(() => {
             </div>
 
             <div class="flex flex-col sm:flex-row gap-2">
-              <Button type="submit" :disabled="loading" class="btn-press">
+              <Button type="submit" :disabled="loading" class="btn-press h-9 sm:flex-1">
                 <Loader2 v-if="loading" class="mr-2 h-4 w-4 animate-spin" />
                 <Save v-else class="mr-2 h-4 w-4" />
                 保存修改
               </Button>
-              <Button type="button" variant="outline" @click="openPasswordDialog" class="btn-press">
+              <Button type="button" variant="outline" @click="openPasswordDialog" class="btn-press h-9 sm:flex-1">
                 <Key class="mr-2 h-4 w-4" />
                 修改密码
               </Button>
-              <Button type="button" variant="outline" @click="openEmailDialog" class="btn-press">
+              <Button type="button" variant="outline" @click="openEmailDialog" class="btn-press h-9 sm:flex-1">
                 <Mail class="mr-2 h-4 w-4" />
                 修改邮箱
               </Button>
@@ -349,7 +349,7 @@ onMounted(() => {
       <div class="mb-4 flex items-center justify-between">
         <h2 class="text-lg sm:text-xl font-semibold">我的模型</h2>
         <RouterLink to="/upload">
-          <Button size="sm" class="btn-press">上传模型</Button>
+          <Button size="sm" class="btn-press h-9">上传模型</Button>
         </RouterLink>
       </div>
 
@@ -372,8 +372,8 @@ onMounted(() => {
                 <RouterLink :to="`/model/${model.id}`" class="font-medium hover:underline line-clamp-1">
                   {{ model.title }}
                 </RouterLink>
-                <div class="mt-1 flex items-center gap-2">
-                  <Badge :variant="model.status === 'approved' ? 'default' : model.status === 'rejected' ? 'destructive' : 'secondary'" class="text-xs">
+                <div class="mt-1 flex items-center gap-2 flex-wrap">
+                  <Badge :variant="model.status === 'approved' ? 'success' : model.status === 'rejected' ? 'destructive' : 'secondary'" class="text-xs">
                     {{ model.status === 'approved' ? '已通过' : model.status === 'rejected' ? '已拒绝' : '审核中' }}
                   </Badge>
                   <span class="text-xs text-muted-foreground">{{ model.downloads }} 下载</span>
@@ -426,21 +426,21 @@ onMounted(() => {
         <div class="space-y-4">
           <div class="space-y-2">
             <Label>旧密码</Label>
-            <Input v-model="oldPassword" type="password" placeholder="请输入旧密码" />
+            <Input v-model="oldPassword" type="password" placeholder="请输入旧密码" class="h-11" />
           </div>
           <div class="space-y-2">
             <Label>新密码</Label>
-            <Input v-model="newPassword" type="password" placeholder="请输入新密码（至少6位）" />
+            <Input v-model="newPassword" type="password" placeholder="请输入新密码（至少6位）" class="h-11" />
           </div>
           <div class="space-y-2">
             <Label>确认密码</Label>
-            <Input v-model="confirmPassword" type="password" placeholder="请再次输入新密码" />
+            <Input v-model="confirmPassword" type="password" placeholder="请再次输入新密码" class="h-11" />
           </div>
           <div v-if="passwordMessage" class="text-sm text-destructive">{{ passwordMessage }}</div>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="passwordDialog = false">取消</Button>
-          <Button @click="changePassword" :disabled="changingPassword">
+          <Button variant="outline" @click="passwordDialog = false" class="h-9">取消</Button>
+          <Button @click="changePassword" :disabled="changingPassword" class="h-9">
             <Loader2 v-if="changingPassword" class="mr-2 h-4 w-4 animate-spin" />
             确认修改
           </Button>
@@ -457,17 +457,17 @@ onMounted(() => {
         <div class="space-y-4">
           <div class="space-y-2">
             <Label>当前邮箱</Label>
-            <Input :model-value="authStore.user?.email" disabled />
+            <Input :model-value="authStore.user?.email" disabled class="h-11" />
           </div>
           <div class="space-y-2">
             <Label>新邮箱</Label>
-            <Input v-model="newEmail" type="email" placeholder="请输入新邮箱地址" />
+            <Input v-model="newEmail" type="email" placeholder="请输入新邮箱地址" class="h-11" />
           </div>
           <div v-if="emailMessage" class="text-sm text-destructive">{{ emailMessage }}</div>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="emailDialog = false">取消</Button>
-          <Button @click="changeEmail" :disabled="changingEmail">
+          <Button variant="outline" @click="emailDialog = false" class="h-9">取消</Button>
+          <Button @click="changeEmail" :disabled="changingEmail" class="h-9">
             <Loader2 v-if="changingEmail" class="mr-2 h-4 w-4 animate-spin" />
             发送验证邮件
           </Button>

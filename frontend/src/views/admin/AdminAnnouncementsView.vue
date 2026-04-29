@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { adminApi, announcementApi } from '@/lib/api'
 import type { Announcement, PaginatedResponse } from '@/types'
+import AdminLayout from '@/components/admin/AdminLayout.vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -134,12 +135,8 @@ onMounted(fetchAnnouncements)
 </script>
 
 <template>
-  <div class="space-y-4 sm:space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div>
-        <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold">公告管理</h1>
-        <p class="text-sm text-muted-foreground">管理系统公告内容</p>
-      </div>
+  <AdminLayout title="公告管理" description="管理系统公告内容">
+    <template #actions>
       <div class="flex items-center gap-3 sm:gap-4">
         <div class="flex items-center gap-2">
           <Megaphone class="h-5 w-5 text-muted-foreground" />
@@ -150,7 +147,7 @@ onMounted(fetchAnnouncements)
           新建
         </Button>
       </div>
-    </div>
+    </template>
 
     <Card>
       <CardContent class="pt-4 sm:pt-6">
@@ -179,7 +176,7 @@ onMounted(fetchAnnouncements)
                     </p>
                   </TableCell>
                   <TableCell>
-                    <Badge :variant="announcement.is_active ? 'default' : 'secondary'">
+                    <Badge :variant="announcement.is_active ? 'success' : 'secondary'">
                       {{ announcement.is_active ? '已启用' : '已禁用' }}
                     </Badge>
                   </TableCell>
@@ -229,7 +226,7 @@ onMounted(fetchAnnouncements)
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2 flex-wrap">
                       <p class="font-medium line-clamp-1">{{ announcement.title }}</p>
-                      <Badge :variant="announcement.is_active ? 'default' : 'secondary'" class="text-xs">
+                      <Badge :variant="announcement.is_active ? 'success' : 'secondary'" class="text-xs">
                         {{ announcement.is_active ? '已启用' : '已禁用' }}
                       </Badge>
                     </div>
@@ -245,7 +242,7 @@ onMounted(fetchAnnouncements)
                   <Button 
                     size="sm" 
                     :variant="announcement.is_active ? 'outline' : 'default'"
-                    class="btn-press h-7 text-xs"
+                    class="btn-press h-9 text-xs"
                     @click="toggleActive(announcement)"
                   >
                     <component :is="announcement.is_active ? PowerOff : Power" class="h-3 w-3 mr-1" />
@@ -254,7 +251,7 @@ onMounted(fetchAnnouncements)
                   <Button 
                     size="sm" 
                     variant="outline"
-                    class="btn-press h-7 text-xs"
+                    class="btn-press h-9 text-xs"
                     @click="openEditDialog(announcement)"
                   >
                     <Pencil class="h-3 w-3 mr-1" />
@@ -263,7 +260,7 @@ onMounted(fetchAnnouncements)
                   <Button 
                     size="sm" 
                     variant="destructive"
-                    class="btn-press h-7 text-xs"
+                    class="btn-press h-9 text-xs"
                     @click="openDeleteDialog(announcement.id)"
                   >
                     <Trash2 class="h-3 w-3 mr-1" />
@@ -321,6 +318,7 @@ onMounted(fetchAnnouncements)
             <Input 
               v-model="editTitle" 
               placeholder="请输入公告标题..."
+              class="h-11"
             />
           </div>
           <div>
@@ -329,6 +327,7 @@ onMounted(fetchAnnouncements)
               v-model="editContent" 
               placeholder="请输入公告内容..."
               :rows="5"
+              class="min-h-[120px]"
             />
           </div>
         </div>
@@ -359,5 +358,5 @@ onMounted(fetchAnnouncements)
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </AdminLayout>
 </template>

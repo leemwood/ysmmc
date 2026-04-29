@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { adminApi } from '@/lib/api'
 import type { User, PaginatedResponse } from '@/types'
 import { useAuthStore } from '@/stores/auth'
+import AdminLayout from '@/components/admin/AdminLayout.vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -147,17 +148,13 @@ onMounted(fetchUsers)
 </script>
 
 <template>
-  <div class="space-y-4 sm:space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div>
-        <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold">用户管理</h1>
-        <p class="text-sm text-muted-foreground">管理系统用户和权限</p>
-      </div>
+  <AdminLayout title="用户管理" description="管理系统用户和权限">
+    <template #actions>
       <div class="flex items-center gap-2">
         <Users class="h-5 w-5 text-muted-foreground" />
         <span class="text-sm text-muted-foreground">共 {{ total }} 个用户</span>
       </div>
-    </div>
+    </template>
 
     <Card>
       <CardContent class="pt-4 sm:pt-6">
@@ -167,7 +164,7 @@ onMounted(fetchUsers)
             <Input 
               v-model="search" 
               placeholder="搜索用户..." 
-              class="pl-10"
+              class="pl-10 h-11"
             />
           </div>
         </div>
@@ -214,7 +211,7 @@ onMounted(fetchUsers)
                       <Ban class="h-3 w-3 mr-1" />
                       已封禁
                     </Badge>
-                    <Badge v-else variant="default" class="bg-green-500">
+                    <Badge v-else variant="success">
                       正常
                     </Badge>
                   </TableCell>
@@ -277,8 +274,8 @@ onMounted(fetchUsers)
             <Card v-for="user in users" :key="user.id" class="overflow-hidden">
               <CardContent class="p-4">
                 <div class="flex items-start gap-3">
-                  <div class="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                    <span class="text-sm font-medium">{{ user.username?.charAt(0).toUpperCase() }}</span>
+                  <div class="h-12 w-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                    <span class="text-base font-medium">{{ user.username?.charAt(0).toUpperCase() }}</span>
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
@@ -301,7 +298,7 @@ onMounted(fetchUsers)
                           v-if="user.role === 'user'"
                           size="sm" 
                           variant="outline"
-                          class="btn-press h-7 text-xs"
+                          class="btn-press h-9 text-xs"
                           @click="setAdmin(user.id)"
                         >
                           设为管理员
@@ -310,7 +307,7 @@ onMounted(fetchUsers)
                           v-else-if="user.role === 'admin'"
                           size="sm" 
                           variant="outline"
-                          class="btn-press h-7 text-xs"
+                          class="btn-press h-9 text-xs"
                           @click="removeAdmin(user.id)"
                         >
                           取消管理员
@@ -321,7 +318,7 @@ onMounted(fetchUsers)
                         <Button 
                           size="sm" 
                           variant="destructive"
-                          class="btn-press h-7 text-xs"
+                          class="btn-press h-9 text-xs"
                           @click="openBanDialog(user.id)"
                         >
                           封禁
@@ -332,7 +329,7 @@ onMounted(fetchUsers)
                         <Button 
                           size="sm" 
                           variant="outline"
-                          class="btn-press h-7 text-xs"
+                          class="btn-press h-9 text-xs"
                           @click="unbanUser(user.id)"
                         >
                           解封
@@ -389,6 +386,7 @@ onMounted(fetchUsers)
               v-model="banReason" 
               placeholder="请输入封禁原因..."
               :rows="3"
+              class="h-24"
             />
           </div>
         </div>
@@ -401,5 +399,5 @@ onMounted(fetchUsers)
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </AdminLayout>
 </template>

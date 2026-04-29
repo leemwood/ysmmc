@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { adminApi } from '@/lib/api'
 import type { Model, User, PaginatedResponse } from '@/types'
+import AdminLayout from '@/components/admin/AdminLayout.vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
