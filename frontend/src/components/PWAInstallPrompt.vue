@@ -75,7 +75,7 @@ onUnmounted(() => {
       leave-from-class="transform translate-y-0 opacity-100"
       leave-to-class="transform translate-y-full opacity-0"
     >
-      <template v-if="showPrompt || isIOS">
+      <div v-if="showPrompt || isIOS">
         <div class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm" @click="dismissPrompt" />
         <div class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 z-50">
           <div class="bg-card/95 backdrop-blur-md border rounded-lg shadow-lg p-4">
@@ -100,7 +100,7 @@ onUnmounted(() => {
                 <X class="h-4 w-4" />
               </Button>
             </div>
-            
+
             <div v-if="!isIOS" class="mt-3 flex gap-2">
               <Button size="sm" class="flex-1 btn-press" @click="installPWA">
                 <Download class="mr-1 h-4 w-4" />
@@ -112,7 +112,7 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-      </template>
+      </div>
     </Transition>
   </Teleport>
 </template>

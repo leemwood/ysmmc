@@ -26,6 +26,9 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Plus, Pencil, Trash2, Megaphone, Power, PowerOff, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { useToast } from '@/composables/useToast'
+
+const { toast } = useToast()
 
 const announcements = ref<Announcement[]>([])
 const loading = ref(true)
@@ -81,10 +84,10 @@ function openDeleteDialog(id: string) {
 
 async function saveAnnouncement() {
   if (!editTitle.value.trim() || !editContent.value.trim()) {
-    alert('请填写标题和内容')
+    toast.warning('请填写标题和内容')
     return
   }
-  
+
   saving.value = true
   try {
     if (isCreate.value) {
@@ -92,16 +95,18 @@ async function saveAnnouncement() {
         title: editTitle.value,
         content: editContent.value
       })
+      toast.success('公告已创建')
     } else {
       await adminApi.updateAnnouncement(editingId.value, {
         title: editTitle.value,
         content: editContent.value
       })
+      toast.success('公告已更新')
     }
     editDialog.value = false
     await fetchAnnouncements()
   } catch (error: any) {
-    alert(error.response?.data?.message || '操作失败')
+    toast.error(error.response?.data?.message || '操作失败')
   } finally {
     saving.value = false
   }
@@ -111,10 +116,11 @@ async function deleteAnnouncement() {
   deleting.value = true
   try {
     await adminApi.deleteAnnouncement(editingId.value)
+    toast.success('公告已删除')
     deleteDialog.value = false
     await fetchAnnouncements()
   } catch (error: any) {
-    alert(error.response?.data?.message || '删除失败')
+    toast.error(error.response?.data?.message || '删除失败')
   } finally {
     deleting.value = false
   }
@@ -126,8 +132,9 @@ async function toggleActive(announcement: Announcement) {
       is_active: !announcement.is_active
     })
     announcement.is_active = !announcement.is_active
+    toast.success(announcement.is_active ? '公告已启用' : '公告已禁用')
   } catch (error: any) {
-    alert(error.response?.data?.message || '操作失败')
+    toast.error(error.response?.data?.message || '操作失败')
   }
 }
 

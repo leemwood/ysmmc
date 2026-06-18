@@ -27,8 +27,10 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Shield, ShieldCheck, ShieldAlert, Ban, Search, Users, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { useToast } from '@/composables/useToast'
 
 const authStore = useAuthStore()
+const { toast } = useToast()
 
 const users = ref<User[]>([])
 const loading = ref(true)
@@ -63,18 +65,20 @@ async function fetchUsers() {
 async function setAdmin(userId: string) {
   try {
     await adminApi.setAdmin(userId)
+    toast.success('已设置为管理员')
     await fetchUsers()
   } catch (error: any) {
-    alert(error.response?.data?.message || '操作失败')
+    toast.error(error.response?.data?.message || '操作失败')
   }
 }
 
 async function removeAdmin(userId: string) {
   try {
     await adminApi.removeAdmin(userId)
+    toast.success('已取消管理员')
     await fetchUsers()
   } catch (error: any) {
-    alert(error.response?.data?.message || '操作失败')
+    toast.error(error.response?.data?.message || '操作失败')
   }
 }
 
@@ -86,17 +90,18 @@ function openBanDialog(userId: string) {
 
 async function banUser() {
   if (!banReason.value.trim()) {
-    alert('请输入封禁原因')
+    toast.warning('请输入封禁原因')
     return
   }
-  
+
   banning.value = true
   try {
     await adminApi.banUser(banUserId.value, banReason.value)
+    toast.success('用户已封禁')
     banDialog.value = false
     await fetchUsers()
   } catch (error: any) {
-    alert(error.response?.data?.message || '操作失败')
+    toast.error(error.response?.data?.message || '操作失败')
   } finally {
     banning.value = false
   }
@@ -105,9 +110,10 @@ async function banUser() {
 async function unbanUser(userId: string) {
   try {
     await adminApi.unbanUser(userId)
+    toast.success('用户已解封')
     await fetchUsers()
   } catch (error: any) {
-    alert(error.response?.data?.message || '操作失败')
+    toast.error(error.response?.data?.message || '操作失败')
   }
 }
 

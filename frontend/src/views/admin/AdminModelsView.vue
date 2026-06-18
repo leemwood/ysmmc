@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminApi } from '@/lib/api'
-import type { Model } from '@/types'
+import type { Model, PaginatedResponse } from '@/types'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,8 +19,10 @@ import {
 } from '@/components/ui/dialog'
 import { Search, Trash2, Eye, ChevronLeft, ChevronRight, Loader2 } from 'lucide-vue-next'
 import { getModelImageUrl } from '@/utils/image'
+import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
+const { toast } = useToast()
 
 const models = ref<Model[]>([])
 const loading = ref(true)
@@ -47,11 +49,12 @@ async function fetchModels() {
   try {
     const status = statusFilter.value === 'all' ? '' : statusFilter.value
     const response = await adminApi.listAllModels(page.value, pageSize.value, status, search.value)
-    const respData = response.data as unknown as { data: Model[]; total: number }
-    models.value = respData.data || []
-    total.value = respData.total || 0
+    const data = response.data.data as PaginatedResponse<Model>
+    models.value = data.items || []
+    total.value = data.total || 0
   } catch (error) {
     console.error('Failed to fetch models:', error)
+    toast.error('获取模型列表失败')
   } finally {
     loading.value = false
   }
@@ -93,15 +96,16 @@ function confirmDelete(model: Model) {
 
 async function deleteModel() {
   if (!deleteTarget.value) return
-  
+
   deleteLoading.value = true
   try {
     await adminApi.deleteModel(deleteTarget.value.id)
+    toast.success('模型已删除')
     deleteDialog.value = false
     deleteTarget.value = null
     fetchModels()
-  } catch (error) {
-    console.error('Failed to delete model:', error)
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || '删除失败')
   } finally {
     deleteLoading.value = false
   }

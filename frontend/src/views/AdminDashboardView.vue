@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { adminApi } from '@/lib/api'
 import type { Model, User, PaginatedResponse } from '@/types'
+import AdminLayout from '@/components/admin/AdminLayout.vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,8 +17,11 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { LayoutDashboard, Package, Users, Download, Check, X, Loader2, FileText, Megaphone } from 'lucide-vue-next'
+import { LayoutDashboard, Package, Users, Download, Check, X, Loader2, FileText } from 'lucide-vue-next'
 import { getAvatarUrl, getModelImageUrl } from '@/utils/image'
+import { useToast } from '@/composables/useToast'
+
+const { toast } = useToast()
 
 const activeTab = ref('overview')
 const loading = ref(true)
@@ -34,19 +38,6 @@ const rejectDialog = ref(false)
 const rejectModelId = ref('')
 const rejectReason = ref('')
 const rejecting = ref(false)
-
-const successMessage = ref('')
-const errorMessage = ref('')
-
-function showSuccess(msg: string) {
-  successMessage.value = msg
-  setTimeout(() => { successMessage.value = '' }, 3000)
-}
-
-function showError(msg: string) {
-  errorMessage.value = msg
-  setTimeout(() => { errorMessage.value = '' }, 3000)
-}
 
 async function fetchStats() {
   try {
@@ -78,11 +69,11 @@ async function fetchPendingProfiles() {
 async function approveModel(id: string) {
   try {
     await adminApi.approveModel(id)
-    showSuccess('模型已通过审核')
+    toast.success('模型已通过审核')
     fetchPendingModels()
     fetchStats()
   } catch (error: any) {
-    showError(error.response?.data?.message || '操作失败')
+    toast.error(error.response?.data?.message || '操作失败')
   }
 }
 
@@ -94,19 +85,19 @@ function openRejectDialog(id: string) {
 
 async function rejectModel() {
   if (!rejectReason.value.trim()) {
-    showError('请输入拒绝原因')
+    toast.warning('请输入拒绝原因')
     return
   }
-  
+
   rejecting.value = true
   try {
     await adminApi.rejectModel(rejectModelId.value, rejectReason.value)
-    showSuccess('模型已拒绝')
+    toast.success('模型已拒绝')
     rejectDialog.value = false
     fetchPendingModels()
     fetchStats()
   } catch (error: any) {
-    showError(error.response?.data?.message || '操作失败')
+    toast.error(error.response?.data?.message || '操作失败')
   } finally {
     rejecting.value = false
   }
@@ -115,20 +106,20 @@ async function rejectModel() {
 async function approveProfile(id: string) {
   try {
     await adminApi.approveProfile(id)
-    showSuccess('资料已通过审核')
+    toast.success('资料已通过审核')
     fetchPendingProfiles()
   } catch (error: any) {
-    showError(error.response?.data?.message || '操作失败')
+    toast.error(error.response?.data?.message || '操作失败')
   }
 }
 
 async function rejectProfile(id: string) {
   try {
     await adminApi.rejectProfile(id)
-    showSuccess('资料变更已拒绝')
+    toast.success('资料变更已拒绝')
     fetchPendingProfiles()
   } catch (error: any) {
-    showError(error.response?.data?.message || '操作失败')
+    toast.error(error.response?.data?.message || '操作失败')
   }
 }
 
@@ -139,66 +130,37 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl px-4 py-6 sm:py-8">
-    <h1 class="mb-6 text-xl sm:text-2xl font-bold">管理后台</h1>
-
-    <div v-if="successMessage" class="mb-4 rounded-md bg-green-500/10 p-3 text-sm text-green-600 animate-fade-in">
-      {{ successMessage }}
-    </div>
-    <div v-if="errorMessage" class="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive animate-fade-in">
-      {{ errorMessage }}
-    </div>
-
-    <div class="mb-6 -mx-4 px-4 overflow-x-auto">
-      <div class="flex gap-1 sm:gap-4 border-b min-w-max">
-        <button
-          class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
-          :class="activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-          @click="activeTab = 'overview'"
-        >
-          <LayoutDashboard class="h-4 w-4" />
-          <span class="hidden sm:inline">概览</span>
-        </button>
-        <button
-          class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
-          :class="activeTab === 'models' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-          @click="activeTab = 'models'"
-        >
-          <Package class="h-4 w-4" />
-          <span class="hidden sm:inline">模型审核</span>
-          <Badge v-if="stats.pending_models > 0" variant="destructive" class="ml-1 text-xs">{{ stats.pending_models }}</Badge>
-        </button>
-        <button
-          class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
-          :class="activeTab === 'profiles' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-          @click="activeTab = 'profiles'"
-        >
-          <Users class="h-4 w-4" />
-          <span class="hidden sm:inline">资料审核</span>
-          <Badge v-if="pendingProfiles.length > 0" variant="destructive" class="ml-1 text-xs">{{ pendingProfiles.length }}</Badge>
-        </button>
-        <RouterLink
-          to="/admin/users"
-          class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
-        >
-          <Users class="h-4 w-4" />
-          <span class="hidden sm:inline">用户管理</span>
-        </RouterLink>
-        <RouterLink
-          to="/admin/models"
-          class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
-        >
-          <Package class="h-4 w-4" />
-          <span class="hidden sm:inline">模型管理</span>
-        </RouterLink>
-        <RouterLink
-          to="/admin/announcements"
-          class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
-        >
-          <Megaphone class="h-4 w-4" />
-          <span class="hidden sm:inline">公告管理</span>
-        </RouterLink>
-      </div>
+  <AdminLayout>
+    <div class="flex flex-wrap gap-2">
+      <Button
+        :variant="activeTab === 'overview' ? 'default' : 'outline'"
+        size="sm"
+        class="btn-press"
+        @click="activeTab = 'overview'"
+      >
+        <LayoutDashboard class="mr-1 h-4 w-4" />
+        统计概览
+      </Button>
+      <Button
+        :variant="activeTab === 'models' ? 'default' : 'outline'"
+        size="sm"
+        class="btn-press"
+        @click="activeTab = 'models'"
+      >
+        <Package class="mr-1 h-4 w-4" />
+        待审核模型
+        <Badge v-if="stats.pending_models > 0" variant="destructive" class="ml-2 text-xs">{{ stats.pending_models }}</Badge>
+      </Button>
+      <Button
+        :variant="activeTab === 'profiles' ? 'default' : 'outline'"
+        size="sm"
+        class="btn-press"
+        @click="activeTab = 'profiles'"
+      >
+        <Users class="mr-1 h-4 w-4" />
+        待审核资料
+        <Badge v-if="pendingProfiles.length > 0" variant="destructive" class="ml-2 text-xs">{{ pendingProfiles.length }}</Badge>
+      </Button>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
@@ -348,8 +310,8 @@ onMounted(async () => {
         <div class="space-y-4">
           <div class="space-y-2">
             <Label>拒绝原因</Label>
-            <Textarea 
-              v-model="rejectReason" 
+            <Textarea
+              v-model="rejectReason"
               placeholder="请输入拒绝原因..."
               :rows="3"
             />
@@ -364,5 +326,5 @@ onMounted(async () => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </AdminLayout>
 </template>

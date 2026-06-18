@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import AppNavbar from '@/components/AppNavbar.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import PWAInstallPrompt from '@/components/PWAInstallPrompt.vue'
+import { ToastContainer } from '@/components/ui/toast'
 
 const authStore = useAuthStore()
 
@@ -26,5 +27,6 @@ onMounted(async () => {
     </main>
     <AppFooter />
     <PWAInstallPrompt />
+    <ToastContainer />
   </div>
 </template>
