@@ -8,52 +8,52 @@ function scrollToTop() {
 
 <template>
   <footer class="border-t bg-muted/30">
-    <div class="container-app py-8">
-      <div class="flex flex-col items-center gap-6 md:flex-row md:justify-between">
+    <div class="container-app py-10">
+      <!-- 品牌与社交 -->
+      <div class="flex flex-col items-center justify-between gap-6 md:flex-row md:items-start">
         <div class="flex flex-col items-center gap-2 text-center md:items-start md:text-left">
-          <p class="text-base font-semibold gradient-text">
+          <p class="text-lg font-semibold gradient-text">
             YSM 模型站 (YSMMC)
           </p>
-          <p class="text-sm text-muted-foreground">
+          <p class="max-w-sm text-sm text-muted-foreground">
             非营利性公益模型分享平台，基于 GPL-3.0 协议开源
           </p>
         </div>
 
-        <div class="flex flex-col items-center gap-4 md:flex-row md:gap-6">
-          <div class="flex items-center gap-3">
-            <a
-              href="#"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="GitHub"
-              class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-ring"
-            >
-              <Github class="h-5 w-5" />
-            </a>
-            <a
-              href="https://qm.qq.com/q/SUKmYH7RyW"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="QQ 用户交流群"
-              class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-ring"
-            >
-              <MessageCircle class="h-5 w-5" />
-            </a>
-          </div>
-          <p class="text-xs text-muted-foreground">
-            &copy; {{ new Date().getFullYear() }} YSMMC. All rights reserved.
-          </p>
+        <div class="flex items-center gap-3">
+          <a
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            class="focus-ring btn-press inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Github class="h-5 w-5" />
+          </a>
+          <a
+            href="https://qm.qq.com/q/SUKmYH7RyW"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="QQ 用户交流群"
+            class="focus-ring btn-press inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <MessageCircle class="h-5 w-5" />
+          </a>
         </div>
+      </div>
+
+      <!-- 版权与返回顶部 -->
+      <div class="mt-8 flex flex-col items-center justify-between gap-3 border-t pt-6 text-xs text-muted-foreground sm:flex-row sm:text-sm">
+        <p>&copy; {{ new Date().getFullYear() }} YSMMC. All rights reserved.</p>
+        <button
+          type="button"
+          class="focus-ring btn-press inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-muted hover:text-foreground"
+          @click="scrollToTop"
+        >
+          <ArrowUp class="h-3.5 w-3.5" />
+          返回顶部
+        </button>
       </div>
     </div>
   </footer>
-
-  <button
-    type="button"
-    aria-label="返回顶部"
-    class="fixed bottom-6 right-6 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform btn-press focus-ring pb-safe md:hidden"
-    @click="scrollToTop"
-  >
-    <ArrowUp class="h-5 w-5" />
-  </button>
 </template>
