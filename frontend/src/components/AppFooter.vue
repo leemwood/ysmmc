@@ -26,18 +26,20 @@ function scrollToTop() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub"
-            class="focus-ring btn-press inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            class="focus-ring btn-press inline-flex h-10 items-center gap-2 rounded-full bg-muted/50 px-4 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <Github class="h-5 w-5" />
+            <Github class="h-4 w-4" />
+            <span>GitHub</span>
           </a>
           <a
             href="https://qm.qq.com/q/SUKmYH7RyW"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="QQ 用户交流群"
-            class="focus-ring btn-press inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            class="focus-ring btn-press inline-flex h-10 items-center gap-2 rounded-full bg-muted/50 px-4 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <MessageCircle class="h-5 w-5" />
+            <MessageCircle class="h-4 w-4" />
+            <span>QQ</span>
           </a>
         </div>
       </div>
