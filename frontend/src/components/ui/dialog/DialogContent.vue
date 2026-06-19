@@ -23,7 +23,7 @@ const props = withDefaults(defineProps<Props>(), {
     />
     <DialogContent
       :class="cn(
-        'fixed z-50 grid w-full gap-4 border bg-background p-6 shadow-2xl transition-all animate-fade-in',
+        'fixed z-50 grid w-full gap-4 border bg-background p-6 text-foreground shadow-2xl transition-all animate-fade-in',
         props.fullScreen
           ? 'inset-0 h-screen w-screen rounded-none'
           : 'left-[50%] top-[50%] max-w-lg translate-x-[-50%] translate-y-[-50%] rounded-lg',
