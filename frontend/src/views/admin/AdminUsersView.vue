@@ -4,18 +4,11 @@ import { adminApi } from '@/lib/api'
 import type { User, PaginatedResponse } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
-import { Card, CardContent } from '@/components/ui/card'
+import ResponsiveTable from '@/components/admin/ResponsiveTable.vue'
+import type { ColumnConfig } from '@/components/admin/ResponsiveTable.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -45,8 +38,16 @@ const banReason = ref('')
 const banning = ref(false)
 
 const isSuperAdmin = computed(() => authStore.user?.role === 'super_admin')
-
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
+
+const userColumns: ColumnConfig<User>[] = [
+  { key: 'user', title: '用户' },
+  { key: 'email', title: '邮箱' },
+  { key: 'role', title: '角色' },
+  { key: 'status', title: '状态' },
+  { key: 'created_at', title: '注册时间', formatter: (row) => new Date(row.created_at).toLocaleDateString() },
+  { key: 'actions', title: '操作', align: 'right' },
+]
 
 async function fetchUsers() {
   loading.value = true
@@ -162,223 +163,135 @@ onMounted(fetchUsers)
       </div>
     </template>
 
-    <Card>
-      <CardContent class="pt-4 sm:pt-6">
-        <div class="mb-4 sm:mb-6">
-          <div class="relative max-w-full sm:max-w-sm">
-            <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              v-model="search" 
-              placeholder="搜索用户..." 
-              class="pl-10 h-11"
-            />
-          </div>
+    <div class="surface p-4 sm:p-6">
+      <div class="mb-4 sm:mb-6">
+        <div class="relative max-w-full sm:max-w-sm">
+          <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input 
+            v-model="search" 
+            placeholder="搜索用户..." 
+            class="h-11 pl-10"
+          />
         </div>
+      </div>
 
-        <div v-if="loading" class="flex justify-center py-8">
-          <Loader2 class="h-8 w-8 animate-spin text-primary" />
-        </div>
-
-        <div v-else class="space-y-3 sm:space-y-0">
-          <div class="hidden sm:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>用户</TableHead>
-                  <TableHead>邮箱</TableHead>
-                  <TableHead>角色</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>注册时间</TableHead>
-                  <TableHead class="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow v-for="user in users" :key="user.id">
-                  <TableCell>
-                    <div class="flex items-center gap-3">
-                      <div class="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                        <span class="text-sm font-medium">{{ user.username?.charAt(0).toUpperCase() }}</span>
-                      </div>
-                      <div>
-                        <p class="font-medium">{{ user.username }}</p>
-                        <p class="text-sm text-muted-foreground">{{ user.bio || '暂无简介' }}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{{ user.email }}</TableCell>
-                  <TableCell>
-                    <Badge :variant="getRoleBadgeVariant(user.role)">
-                      <component :is="getRoleIcon(user.role)" class="h-3 w-3 mr-1" />
-                      {{ getRoleLabel(user.role) }}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge v-if="user.is_banned" variant="destructive">
-                      <Ban class="h-3 w-3 mr-1" />
-                      已封禁
-                    </Badge>
-                    <Badge v-else variant="success">
-                      正常
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {{ new Date(user.created_at).toLocaleDateString() }}
-                  </TableCell>
-                  <TableCell class="text-right">
-                    <div class="flex items-center justify-end gap-2">
-                      <template v-if="isSuperAdmin && user.role !== 'super_admin'">
-                        <Button 
-                          v-if="user.role === 'user'"
-                          size="sm" 
-                          variant="outline"
-                          class="btn-press"
-                          @click="setAdmin(user.id)"
-                        >
-                          设为管理员
-                        </Button>
-                        <Button 
-                          v-else-if="user.role === 'admin'"
-                          size="sm" 
-                          variant="outline"
-                          class="btn-press"
-                          @click="removeAdmin(user.id)"
-                        >
-                          取消管理员
-                        </Button>
-                      </template>
-                      
-                      <template v-if="!user.is_banned && user.role !== 'super_admin'">
-                        <Button 
-                          size="sm" 
-                          variant="destructive"
-                          class="btn-press"
-                          @click="openBanDialog(user.id)"
-                        >
-                          <Ban class="h-4 w-4 sm:mr-1" />
-                          <span class="hidden sm:inline">封禁</span>
-                        </Button>
-                      </template>
-                      
-                      <template v-if="user.is_banned">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          class="btn-press"
-                          @click="unbanUser(user.id)"
-                        >
-                          解封
-                        </Button>
-                      </template>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+      <ResponsiveTable
+        :columns="userColumns"
+        :rows="users"
+        :loading="loading"
+        :skeleton-rows="5"
+      >
+        <template #user="{ row }">
+          <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted">
+              <span class="text-sm font-medium">{{ row.username?.charAt(0).toUpperCase() }}</span>
+            </div>
+            <div class="min-w-0">
+              <p class="font-medium">{{ row.username }}</p>
+              <p class="text-sm text-muted-foreground line-clamp-1">{{ row.bio || '暂无简介' }}</p>
+            </div>
           </div>
+        </template>
 
-          <div class="sm:hidden space-y-3">
-            <Card v-for="user in users" :key="user.id" class="overflow-hidden">
-              <CardContent class="p-4">
-                <div class="flex items-start gap-3">
-                  <div class="h-12 w-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                    <span class="text-base font-medium">{{ user.username?.charAt(0).toUpperCase() }}</span>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <p class="font-medium">{{ user.username }}</p>
-                      <Badge :variant="getRoleBadgeVariant(user.role)" class="text-xs">
-                        <component :is="getRoleIcon(user.role)" class="h-3 w-3 mr-1" />
-                        {{ getRoleLabel(user.role) }}
-                      </Badge>
-                      <Badge v-if="user.is_banned" variant="destructive" class="text-xs">
-                        已封禁
-                      </Badge>
-                    </div>
-                    <p class="text-sm text-muted-foreground truncate">{{ user.email }}</p>
-                    <p class="text-xs text-muted-foreground mt-1">
-                      {{ new Date(user.created_at).toLocaleDateString() }}
-                    </p>
-                    <div class="flex flex-wrap gap-2 mt-3">
-                      <template v-if="isSuperAdmin && user.role !== 'super_admin'">
-                        <Button 
-                          v-if="user.role === 'user'"
-                          size="sm" 
-                          variant="outline"
-                          class="btn-press h-9 text-xs"
-                          @click="setAdmin(user.id)"
-                        >
-                          设为管理员
-                        </Button>
-                        <Button 
-                          v-else-if="user.role === 'admin'"
-                          size="sm" 
-                          variant="outline"
-                          class="btn-press h-9 text-xs"
-                          @click="removeAdmin(user.id)"
-                        >
-                          取消管理员
-                        </Button>
-                      </template>
-                      
-                      <template v-if="!user.is_banned && user.role !== 'super_admin'">
-                        <Button 
-                          size="sm" 
-                          variant="destructive"
-                          class="btn-press h-9 text-xs"
-                          @click="openBanDialog(user.id)"
-                        >
-                          封禁
-                        </Button>
-                      </template>
-                      
-                      <template v-if="user.is_banned">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          class="btn-press h-9 text-xs"
-                          @click="unbanUser(user.id)"
-                        >
-                          解封
-                        </Button>
-                      </template>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        <template #email="{ row }">
+          <span class="line-clamp-1 text-sm">{{ row.email }}</span>
+        </template>
+
+        <template #role="{ row }">
+          <Badge :variant="getRoleBadgeVariant(row.role)">
+            <component :is="getRoleIcon(row.role)" class="mr-1 h-3 w-3" />
+            {{ getRoleLabel(row.role) }}
+          </Badge>
+        </template>
+
+        <template #status="{ row }">
+          <Badge v-if="row.is_banned" variant="destructive">
+            <Ban class="mr-1 h-3 w-3" />
+            已封禁
+          </Badge>
+          <Badge v-else variant="success">
+            正常
+          </Badge>
+        </template>
+
+        <template #actions="{ row }">
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <template v-if="isSuperAdmin && row.role !== 'super_admin'">
+              <Button 
+                v-if="row.role === 'user'"
+                size="sm" 
+                variant="outline"
+                class="btn-press"
+                @click="setAdmin(row.id)"
+              >
+                设为管理员
+              </Button>
+              <Button 
+                v-else-if="row.role === 'admin'"
+                size="sm" 
+                variant="outline"
+                class="btn-press"
+                @click="removeAdmin(row.id)"
+              >
+                取消管理员
+              </Button>
+            </template>
+            
+            <template v-if="!row.is_banned && row.role !== 'super_admin'">
+              <Button 
+                size="sm" 
+                variant="destructive"
+                class="btn-press"
+                @click="openBanDialog(row.id)"
+              >
+                <Ban class="h-4 w-4 sm:mr-1" />
+                <span class="hidden sm:inline">封禁</span>
+              </Button>
+            </template>
+            
+            <template v-if="row.is_banned">
+              <Button 
+                size="sm" 
+                variant="outline"
+                class="btn-press"
+                @click="unbanUser(row.id)"
+              >
+                解封
+              </Button>
+            </template>
           </div>
-        </div>
-        
-        <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 mt-4 sm:mt-6">
-          <Button 
-            variant="outline" 
-            size="sm"
-            class="btn-press"
-            :disabled="page === 1"
-            @click="page--; fetchUsers()"
-          >
-            <ChevronLeft class="h-4 w-4 sm:mr-1" />
-            <span class="hidden sm:inline">上一页</span>
-          </Button>
-          <span class="text-sm text-muted-foreground px-2">
-            {{ page }} / {{ totalPages }}
-          </span>
-          <Button 
-            variant="outline" 
-            size="sm"
-            class="btn-press"
-            :disabled="page === totalPages"
-            @click="page++; fetchUsers()"
-          >
-            <span class="hidden sm:inline">下一页</span>
-            <ChevronRight class="h-4 w-4 sm:ml-1" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </template>
+      </ResponsiveTable>
+      
+      <div v-if="totalPages > 1" class="mt-4 flex items-center justify-center gap-2 sm:mt-6">
+        <Button 
+          variant="outline" 
+          size="sm"
+          class="btn-press"
+          :disabled="page === 1"
+          @click="page--; fetchUsers()"
+        >
+          <ChevronLeft class="h-4 w-4 sm:mr-1" />
+          <span class="hidden sm:inline">上一页</span>
+        </Button>
+        <span class="px-2 text-sm text-muted-foreground">
+          {{ page }} / {{ totalPages }}
+        </span>
+        <Button 
+          variant="outline" 
+          size="sm"
+          class="btn-press"
+          :disabled="page === totalPages"
+          @click="page++; fetchUsers()"
+        >
+          <span class="hidden sm:inline">下一页</span>
+          <ChevronRight class="h-4 w-4 sm:ml-1" />
+        </Button>
+      </div>
+    </div>
 
     <Dialog v-model:open="banDialog">
-      <DialogContent>
+      <DialogContent class="max-w-[calc(100%-2rem)] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>封禁用户</DialogTitle>
           <DialogDescription>
@@ -399,7 +312,7 @@ onMounted(fetchUsers)
         <DialogFooter>
           <Button variant="outline" @click="banDialog = false">取消</Button>
           <Button variant="destructive" @click="banUser" :disabled="banning">
-            <Loader2 v-if="banning" class="h-4 w-4 mr-2 animate-spin" />
+            <Loader2 v-if="banning" class="mr-2 h-4 w-4 animate-spin" />
             确认封禁
           </Button>
         </DialogFooter>

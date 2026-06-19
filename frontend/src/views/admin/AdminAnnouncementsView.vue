@@ -3,18 +3,11 @@ import { ref, onMounted, computed } from 'vue'
 import { adminApi, announcementApi } from '@/lib/api'
 import type { Announcement, PaginatedResponse } from '@/types'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
-import { Card, CardContent } from '@/components/ui/card'
+import ResponsiveTable from '@/components/admin/ResponsiveTable.vue'
+import type { ColumnConfig } from '@/components/admin/ResponsiveTable.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -46,6 +39,14 @@ const deleting = ref(false)
 const isCreate = ref(false)
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
+
+const announcementColumns: ColumnConfig<Announcement>[] = [
+  { key: 'title', title: '标题', width: '200px' },
+  { key: 'content', title: '内容' },
+  { key: 'status', title: '状态', width: '100px' },
+  { key: 'created_at', title: '创建时间', width: '120px', formatter: (row) => new Date(row.created_at).toLocaleDateString() },
+  { key: 'actions', title: '操作', align: 'right', width: '220px' },
+]
 
 async function fetchAnnouncements() {
   loading.value = true
@@ -150,169 +151,101 @@ onMounted(fetchAnnouncements)
           <span class="text-sm text-muted-foreground">共 {{ total }} 条公告</span>
         </div>
         <Button class="btn-press" @click="openCreateDialog">
-          <Plus class="h-4 w-4 mr-2" />
+          <Plus class="mr-2 h-4 w-4" />
           新建
         </Button>
       </div>
     </template>
 
-    <Card>
-      <CardContent class="pt-4 sm:pt-6">
-        <div v-if="loading" class="flex justify-center py-8">
-          <Loader2 class="h-8 w-8 animate-spin text-primary" />
-        </div>
+    <div class="surface p-4 sm:p-6">
+      <ResponsiveTable
+        :columns="announcementColumns"
+        :rows="announcements"
+        :loading="loading"
+        :skeleton-rows="5"
+      >
+        <template #title="{ row }">
+          <span class="font-medium line-clamp-1">{{ row.title }}</span>
+        </template>
 
-        <div v-else class="space-y-3 sm:space-y-0">
-          <div class="hidden sm:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead class="w-[200px]">标题</TableHead>
-                  <TableHead>内容</TableHead>
-                  <TableHead class="w-[100px]">状态</TableHead>
-                  <TableHead class="w-[150px]">创建时间</TableHead>
-                  <TableHead class="w-[200px] text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow v-for="announcement in announcements" :key="announcement.id">
-                  <TableCell class="font-medium">{{ announcement.title }}</TableCell>
-                  <TableCell>
-                    <p class="line-clamp-2 text-sm text-muted-foreground">
-                      {{ announcement.content }}
-                    </p>
-                  </TableCell>
-                  <TableCell>
-                    <Badge :variant="announcement.is_active ? 'success' : 'secondary'">
-                      {{ announcement.is_active ? '已启用' : '已禁用' }}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {{ new Date(announcement.created_at).toLocaleDateString() }}
-                  </TableCell>
-                  <TableCell class="text-right">
-                    <div class="flex items-center justify-end gap-2">
-                      <Button 
-                        size="sm" 
-                        :variant="announcement.is_active ? 'outline' : 'default'"
-                        class="btn-press"
-                        @click="toggleActive(announcement)"
-                      >
-                        <component :is="announcement.is_active ? PowerOff : Power" class="h-4 w-4 sm:mr-1" />
-                        <span class="hidden sm:inline">{{ announcement.is_active ? '禁用' : '启用' }}</span>
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        class="btn-press"
-                        @click="openEditDialog(announcement)"
-                      >
-                        <Pencil class="h-4 w-4 sm:mr-1" />
-                        <span class="hidden sm:inline">编辑</span>
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive"
-                        class="btn-press"
-                        @click="openDeleteDialog(announcement.id)"
-                      >
-                        <Trash2 class="h-4 w-4 sm:mr-1" />
-                        <span class="hidden sm:inline">删除</span>
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
+        <template #content="{ row }">
+          <p class="line-clamp-2 text-sm text-muted-foreground">
+            {{ row.content }}
+          </p>
+        </template>
 
-          <div class="sm:hidden space-y-3">
-            <Card v-for="announcement in announcements" :key="announcement.id" class="overflow-hidden">
-              <CardContent class="p-4">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <p class="font-medium line-clamp-1">{{ announcement.title }}</p>
-                      <Badge :variant="announcement.is_active ? 'success' : 'secondary'" class="text-xs">
-                        {{ announcement.is_active ? '已启用' : '已禁用' }}
-                      </Badge>
-                    </div>
-                    <p class="text-sm text-muted-foreground line-clamp-2 mt-1">
-                      {{ announcement.content }}
-                    </p>
-                    <p class="text-xs text-muted-foreground mt-2">
-                      {{ new Date(announcement.created_at).toLocaleDateString() }}
-                    </p>
-                  </div>
-                </div>
-                <div class="flex flex-wrap gap-2 mt-3">
-                  <Button 
-                    size="sm" 
-                    :variant="announcement.is_active ? 'outline' : 'default'"
-                    class="btn-press h-9 text-xs"
-                    @click="toggleActive(announcement)"
-                  >
-                    <component :is="announcement.is_active ? PowerOff : Power" class="h-3 w-3 mr-1" />
-                    {{ announcement.is_active ? '禁用' : '启用' }}
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    class="btn-press h-9 text-xs"
-                    @click="openEditDialog(announcement)"
-                  >
-                    <Pencil class="h-3 w-3 mr-1" />
-                    编辑
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="destructive"
-                    class="btn-press h-9 text-xs"
-                    @click="openDeleteDialog(announcement.id)"
-                  >
-                    <Trash2 class="h-3 w-3 mr-1" />
-                    删除
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+        <template #status="{ row }">
+          <Badge :variant="row.is_active ? 'success' : 'secondary'">
+            {{ row.is_active ? '已启用' : '已禁用' }}
+          </Badge>
+        </template>
+
+        <template #actions="{ row }">
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <Button 
+              size="sm" 
+              :variant="row.is_active ? 'outline' : 'default'"
+              class="btn-press"
+              @click="toggleActive(row)"
+            >
+              <component :is="row.is_active ? PowerOff : Power" class="h-4 w-4 sm:mr-1" />
+              <span class="hidden sm:inline">{{ row.is_active ? '禁用' : '启用' }}</span>
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              class="btn-press"
+              @click="openEditDialog(row)"
+            >
+              <Pencil class="h-4 w-4 sm:mr-1" />
+              <span class="hidden sm:inline">编辑</span>
+            </Button>
+            <Button 
+              size="sm" 
+              variant="destructive"
+              class="btn-press"
+              @click="openDeleteDialog(row.id)"
+            >
+              <Trash2 class="h-4 w-4 sm:mr-1" />
+              <span class="hidden sm:inline">删除</span>
+            </Button>
           </div>
-        </div>
-        
-        <div v-if="announcements.length === 0 && !loading" class="text-center py-8 text-muted-foreground">
-          暂无公告
-        </div>
-        
-        <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 mt-4 sm:mt-6">
-          <Button 
-            variant="outline" 
-            size="sm"
-            class="btn-press"
-            :disabled="page === 1"
-            @click="page--; fetchAnnouncements()"
-          >
-            <ChevronLeft class="h-4 w-4 sm:mr-1" />
-            <span class="hidden sm:inline">上一页</span>
-          </Button>
-          <span class="text-sm text-muted-foreground px-2">
-            {{ page }} / {{ totalPages }}
-          </span>
-          <Button 
-            variant="outline" 
-            size="sm"
-            class="btn-press"
-            :disabled="page === totalPages"
-            @click="page++; fetchAnnouncements()"
-          >
-            <span class="hidden sm:inline">下一页</span>
-            <ChevronRight class="h-4 w-4 sm:ml-1" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </template>
+      </ResponsiveTable>
+      
+      <div v-if="announcements.length === 0 && !loading" class="py-8 text-center text-muted-foreground">
+        暂无公告
+      </div>
+      
+      <div v-if="totalPages > 1" class="mt-4 flex items-center justify-center gap-2 sm:mt-6">
+        <Button 
+          variant="outline" 
+          size="sm"
+          class="btn-press"
+          :disabled="page === 1"
+          @click="page--; fetchAnnouncements()"
+        >
+          <ChevronLeft class="h-4 w-4 sm:mr-1" />
+          <span class="hidden sm:inline">上一页</span>
+        </Button>
+        <span class="px-2 text-sm text-muted-foreground">
+          {{ page }} / {{ totalPages }}
+        </span>
+        <Button 
+          variant="outline" 
+          size="sm"
+          class="btn-press"
+          :disabled="page === totalPages"
+          @click="page++; fetchAnnouncements()"
+        >
+          <span class="hidden sm:inline">下一页</span>
+          <ChevronRight class="h-4 w-4 sm:ml-1" />
+        </Button>
+      </div>
+    </div>
 
     <Dialog v-model:open="editDialog">
-      <DialogContent>
+      <DialogContent class="max-w-[calc(100%-2rem)] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{{ isCreate ? '新建公告' : '编辑公告' }}</DialogTitle>
           <DialogDescription>
@@ -341,7 +274,7 @@ onMounted(fetchAnnouncements)
         <DialogFooter>
           <Button variant="outline" @click="editDialog = false">取消</Button>
           <Button @click="saveAnnouncement" :disabled="saving">
-            <Loader2 v-if="saving" class="h-4 w-4 mr-2 animate-spin" />
+            <Loader2 v-if="saving" class="mr-2 h-4 w-4 animate-spin" />
             {{ isCreate ? '创建' : '保存' }}
           </Button>
         </DialogFooter>
@@ -349,7 +282,7 @@ onMounted(fetchAnnouncements)
     </Dialog>
 
     <Dialog v-model:open="deleteDialog">
-      <DialogContent>
+      <DialogContent class="max-w-[calc(100%-2rem)] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>删除公告</DialogTitle>
           <DialogDescription>
@@ -359,7 +292,7 @@ onMounted(fetchAnnouncements)
         <DialogFooter>
           <Button variant="outline" @click="deleteDialog = false">取消</Button>
           <Button variant="destructive" @click="deleteAnnouncement" :disabled="deleting">
-            <Loader2 v-if="deleting" class="h-4 w-4 mr-2 animate-spin" />
+            <Loader2 v-if="deleting" class="mr-2 h-4 w-4 animate-spin" />
             确认删除
           </Button>
         </DialogFooter>

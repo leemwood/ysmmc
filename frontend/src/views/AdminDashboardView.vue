@@ -6,7 +6,6 @@ import AdminLayout from '@/components/admin/AdminLayout.vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import {
   Dialog,
   DialogContent,
@@ -18,7 +17,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { LayoutDashboard, Package, Users, Download, Check, X, Loader2, FileText } from 'lucide-vue-next'
-import { getAvatarUrl, getModelImageUrl } from '@/utils/image'
+import { getModelImageUrl } from '@/utils/image'
 import { useToast } from '@/composables/useToast'
 
 const { toast } = useToast()
@@ -168,51 +167,51 @@ onMounted(async () => {
     </div>
 
     <template v-else>
-      <div v-if="activeTab === 'overview'" class="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent class="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+      <div v-if="activeTab === 'overview'" class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <Card class="card-hover">
+          <CardContent class="flex flex-col items-center gap-2 p-4 text-center sm:flex-row sm:gap-4 sm:p-6 sm:text-left">
             <div class="rounded-full bg-primary/10 p-2 sm:p-3">
-              <Users class="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              <Users class="h-5 w-5 text-primary sm:h-6 sm:w-6" />
             </div>
             <div>
-              <p class="text-xs sm:text-sm text-muted-foreground">总用户数</p>
-              <p class="text-xl sm:text-2xl font-bold">{{ stats.total_users }}</p>
+              <p class="text-xs text-muted-foreground sm:text-sm">总用户数</p>
+              <p class="text-xl font-bold sm:text-2xl">{{ stats.total_users }}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent class="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+        <Card class="card-hover">
+          <CardContent class="flex flex-col items-center gap-2 p-4 text-center sm:flex-row sm:gap-4 sm:p-6 sm:text-left">
             <div class="rounded-full bg-primary/10 p-2 sm:p-3">
-              <Package class="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              <Package class="h-5 w-5 text-primary sm:h-6 sm:w-6" />
             </div>
             <div>
-              <p class="text-xs sm:text-sm text-muted-foreground">总模型数</p>
-              <p class="text-xl sm:text-2xl font-bold">{{ stats.total_models }}</p>
+              <p class="text-xs text-muted-foreground sm:text-sm">总模型数</p>
+              <p class="text-xl font-bold sm:text-2xl">{{ stats.total_models }}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent class="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+        <Card class="card-hover">
+          <CardContent class="flex flex-col items-center gap-2 p-4 text-center sm:flex-row sm:gap-4 sm:p-6 sm:text-left">
             <div class="rounded-full bg-yellow-500/10 p-2 sm:p-3">
-              <FileText class="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />
+              <FileText class="h-5 w-5 text-yellow-500 sm:h-6 sm:w-6" />
             </div>
             <div>
-              <p class="text-xs sm:text-sm text-muted-foreground">待审核</p>
-              <p class="text-xl sm:text-2xl font-bold">{{ stats.pending_models }}</p>
+              <p class="text-xs text-muted-foreground sm:text-sm">待审核</p>
+              <p class="text-xl font-bold sm:text-2xl">{{ stats.pending_models }}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent class="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+        <Card class="card-hover">
+          <CardContent class="flex flex-col items-center gap-2 p-4 text-center sm:flex-row sm:gap-4 sm:p-6 sm:text-left">
             <div class="rounded-full bg-green-500/10 p-2 sm:p-3">
-              <Download class="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
+              <Download class="h-5 w-5 text-green-500 sm:h-6 sm:w-6" />
             </div>
             <div>
-              <p class="text-xs sm:text-sm text-muted-foreground">总下载量</p>
-              <p class="text-xl sm:text-2xl font-bold">{{ stats.total_downloads }}</p>
+              <p class="text-xs text-muted-foreground sm:text-sm">总下载量</p>
+              <p class="text-xl font-bold sm:text-2xl">{{ stats.total_downloads }}</p>
             </div>
           </CardContent>
         </Card>
@@ -224,26 +223,26 @@ onMounted(async () => {
         </div>
 
         <div v-else class="space-y-3 sm:space-y-4">
-          <Card v-for="model in pendingModels" :key="model.id" class="overflow-hidden">
+          <Card v-for="model in pendingModels" :key="model.id" class="overflow-hidden card-hover">
             <CardContent class="p-4">
-              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-3 sm:gap-4">
-                  <div class="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 rounded bg-muted overflow-hidden">
-                    <img v-if="model.image_id || model.image_url" :src="getModelImageUrl(model.image_id, model.image_url)" class="h-full w-full object-cover rounded" />
+                  <div class="h-14 w-14 flex-shrink-0 overflow-hidden rounded bg-muted sm:h-16 sm:w-16">
+                    <img v-if="model.image_id || model.image_url" :src="getModelImageUrl(model.image_id, model.image_url)" class="h-full w-full rounded object-cover" />
                   </div>
                   <div class="min-w-0 flex-1">
                     <RouterLink :to="`/model/${model.id}`" class="font-medium hover:underline line-clamp-1">
                       {{ model.title }}
                     </RouterLink>
-                    <p class="text-sm text-muted-foreground line-clamp-1 mt-0.5">
+                    <p class="mt-0.5 line-clamp-1 text-sm text-muted-foreground">
                       {{ model.description || '暂无描述' }}
                     </p>
-                    <p class="text-xs text-muted-foreground mt-0.5">
+                    <p class="mt-0.5 text-xs text-muted-foreground">
                       上传者: {{ model.user?.username }}
                     </p>
                   </div>
                 </div>
-                <div class="flex gap-2 justify-end sm:flex-shrink-0">
+                <div class="flex flex-col gap-2 sm:flex-row sm:flex-shrink-0">
                   <Button size="sm" variant="default" class="btn-press" @click="approveModel(model.id)">
                     <Check class="mr-1 h-4 w-4" />
                     通过
@@ -265,26 +264,24 @@ onMounted(async () => {
         </div>
 
         <div v-else class="space-y-3 sm:space-y-4">
-          <Card v-for="user in pendingProfiles" :key="user.id" class="overflow-hidden">
+          <Card v-for="user in pendingProfiles" :key="user.id" class="overflow-hidden card-hover">
             <CardContent class="p-4">
-              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-3 sm:gap-4">
-                  <Avatar class="h-10 w-10 sm:h-12 sm:w-12">
-                    <AvatarImage :src="getAvatarUrl(user.avatar_id, user.avatar_url) || undefined">
-                      <Users class="h-5 w-5 sm:h-6 sm:w-6" />
-                    </AvatarImage>
-                  </Avatar>
+                  <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium sm:h-12 sm:w-12 sm:text-base">
+                    {{ user.username?.charAt(0).toUpperCase() }}
+                  </div>
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{{ user.username }}</p>
-                    <p class="text-sm text-muted-foreground line-clamp-1">
+                    <p class="line-clamp-1 text-sm text-muted-foreground">
                       新用户名: {{ user.pending_changes?.username || '无变更' }}
                     </p>
-                    <p class="text-sm text-muted-foreground line-clamp-1">
+                    <p class="line-clamp-1 text-sm text-muted-foreground">
                       新简介: {{ user.pending_changes?.bio || '无变更' }}
                     </p>
                   </div>
                 </div>
-                <div class="flex gap-2 justify-end sm:flex-shrink-0">
+                <div class="flex flex-col gap-2 sm:flex-row sm:flex-shrink-0">
                   <Button size="sm" variant="default" class="btn-press" @click="approveProfile(user.id)">
                     <Check class="mr-1 h-4 w-4" />
                     通过
@@ -302,7 +299,7 @@ onMounted(async () => {
     </template>
 
     <Dialog v-model:open="rejectDialog">
-      <DialogContent>
+      <DialogContent class="max-w-[calc(100%-2rem)] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>拒绝模型</DialogTitle>
           <DialogDescription>请输入拒绝原因，将通知上传者</DialogDescription>

@@ -9,7 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Upload, X, Loader2, ArrowLeft } from 'lucide-vue-next'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Progress } from '@/components/ui/progress'
+import { Upload, X, ArrowLeft, FileArchive, ImageOff } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,6 +30,8 @@ const imagePreview = ref('')
 const submitting = ref(false)
 const error = ref('')
 const uploadProgress = ref(0)
+const fileDragOver = ref(false)
+const imageDragOver = ref(false)
 
 const modelId = computed(() => route.params.id as string)
 
@@ -53,44 +57,84 @@ async function fetchModel() {
   }
 }
 
+function validateModelFile(selectedFile: File): boolean {
+  if (selectedFile.size > MAX_FILE_SIZE) {
+    error.value = '模型文件大小不能超过100MB'
+    return false
+  }
+  return true
+}
+
 function handleFileChange(e: Event) {
   const target = e.target as HTMLInputElement
   if (target.files && target.files[0]) {
     const selectedFile = target.files[0]
-    
-    if (selectedFile.size > MAX_FILE_SIZE) {
-      error.value = '模型文件大小不能超过100MB'
-      return
+    if (validateModelFile(selectedFile)) {
+      file.value = selectedFile
+      error.value = ''
     }
-    
-    file.value = selectedFile
-    error.value = ''
   }
+}
+
+function handleFileDrop(e: DragEvent) {
+  e.preventDefault()
+  fileDragOver.value = false
+  const files = e.dataTransfer?.files
+  if (files && files[0]) {
+    const selectedFile = files[0]
+    if (validateModelFile(selectedFile)) {
+      file.value = selectedFile
+      error.value = ''
+    }
+  }
+}
+
+function removeFile() {
+  file.value = null
+}
+
+function validateImageFile(selectedFile: File): boolean {
+  if (selectedFile.size > MAX_IMAGE_SIZE) {
+    error.value = '图片大小不能超过5MB'
+    return false
+  }
+  if (!selectedFile.type.startsWith('image/')) {
+    error.value = '请选择有效的图片文件'
+    return false
+  }
+  return true
 }
 
 function handleImageChange(e: Event) {
   const target = e.target as HTMLInputElement
   if (target.files && target.files[0]) {
     const selectedFile = target.files[0]
-    
-    if (selectedFile.size > MAX_IMAGE_SIZE) {
-      error.value = '图片大小不能超过5MB'
-      return
+    if (validateImageFile(selectedFile)) {
+      readImageFile(selectedFile)
     }
-    
-    if (!selectedFile.type.startsWith('image/')) {
-      error.value = '请选择有效的图片文件'
-      return
-    }
-    
-    imageFile.value = selectedFile
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      imagePreview.value = e.target?.result as string
-    }
-    reader.readAsDataURL(imageFile.value)
-    error.value = ''
   }
+}
+
+function handleImageDrop(e: DragEvent) {
+  e.preventDefault()
+  imageDragOver.value = false
+  const files = e.dataTransfer?.files
+  if (files && files[0]) {
+    const selectedFile = files[0]
+    if (validateImageFile(selectedFile)) {
+      readImageFile(selectedFile)
+    }
+  }
+}
+
+function readImageFile(selectedFile: File) {
+  imageFile.value = selectedFile
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    imagePreview.value = e.target?.result as string
+  }
+  reader.readAsDataURL(selectedFile)
+  error.value = ''
 }
 
 function removeImage() {
@@ -142,7 +186,6 @@ async function handleSubmit() {
 
     uploadProgress.value = 60
     let imageId: string | undefined
-    let imageUrl: string | undefined
     if (imageFile.value) {
       const imageUpload = await uploadApi.uploadImage(imageFile.value)
       imageId = imageUpload.data.data?.file_id
@@ -155,7 +198,6 @@ async function handleSubmit() {
       file_path: modelData.file_path,
       file_size: modelData.file_size,
       image_id: imageId,
-      image_url: imageUrl,
       changelog: changelog.value || undefined,
     })
 
@@ -176,8 +218,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl px-4 py-8">
-    <Button variant="ghost" size="sm" class="mb-4" @click="router.back()">
+  <div class="mx-auto max-w-2xl px-4 py-6 sm:py-8">
+    <Button variant="ghost" size="sm" class="focus-ring btn-press mb-4" @click="router.back()">
       <ArrowLeft class="mr-2 h-4 w-4" />
       返回
     </Button>
@@ -188,7 +230,7 @@ onMounted(() => {
     </div>
 
     <template v-else-if="model">
-      <Card class="mb-6">
+      <Card class="card-hover mb-6">
         <CardHeader>
           <CardTitle class="text-xl">{{ model.title }}</CardTitle>
           <p class="text-sm text-muted-foreground">
@@ -197,15 +239,15 @@ onMounted(() => {
         </CardHeader>
       </Card>
 
-      <Card>
+      <Card class="card-hover">
         <CardHeader>
-          <CardTitle class="text-2xl">上传新版本</CardTitle>
+          <CardTitle class="text-xl sm:text-2xl">上传新版本</CardTitle>
         </CardHeader>
         <CardContent>
           <form @submit.prevent="handleSubmit" class="space-y-6">
-            <div v-if="error" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-              {{ error }}
-            </div>
+            <Alert v-if="error" variant="destructive" class="animate-shake">
+              <AlertDescription>{{ error }}</AlertDescription>
+            </Alert>
 
             <div class="space-y-2">
               <Label for="version">版本号 *</Label>
@@ -214,16 +256,17 @@ onMounted(() => {
                   id="version"
                   v-model="versionNumber"
                   placeholder="如: 1.0.1"
-                  :class="versionNumberError ? 'border-destructive' : ''"
+                  :error="!!versionNumberError"
+                  class="h-11"
                 />
-                <Button type="button" variant="outline" @click="suggestNextVersion">
+                <Button type="button" variant="outline" class="focus-ring btn-press" @click="suggestNextVersion">
                   自动递增
                 </Button>
               </div>
               <p v-if="versionNumberError" class="text-sm text-destructive">
                 {{ versionNumberError }}
               </p>
-              <p class="text-sm text-muted-foreground">
+              <p class="text-xs text-muted-foreground">
                 版本号格式: x.y.z (如 1.0.1, 2.0.0)
               </p>
             </div>
@@ -245,60 +288,82 @@ onMounted(() => {
                 v-model="changelog"
                 placeholder="详细的更新内容，如：&#10;- 修复了xxx问题&#10;- 新增了xxx功能&#10;- 优化了xxx性能"
                 :rows="4"
+                class="min-h-[100px]"
               />
             </div>
 
             <div class="space-y-2">
-              <Label for="file">模型文件 * (.ysm, .zip)</Label>
-              <Input
-                id="file"
-                type="file"
-                accept=".ysm,.zip"
-                @change="handleFileChange"
-                required
-              />
-              <p class="text-sm text-muted-foreground">
-                支持 .ysm, .zip 格式，最大 100MB
-              </p>
-              <p v-if="file" class="text-sm text-primary">
-                已选择: {{ file.name }} ({{ formatFileSize(file.size) }})
-              </p>
+              <Label>模型文件 * (.ysm, .zip)</Label>
+              <div v-if="file" class="surface flex items-center justify-between p-3">
+                <div class="flex items-center gap-3 min-w-0">
+                  <FileArchive class="h-8 w-8 flex-shrink-0 text-primary" />
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-medium">{{ file.name }}</p>
+                    <p class="text-xs text-muted-foreground">{{ formatFileSize(file.size) }}</p>
+                  </div>
+                </div>
+                <Button type="button" variant="ghost" size="icon" class="focus-ring btn-press h-8 w-8" aria-label="移除文件" @click="removeFile">
+                  <X class="h-4 w-4" />
+                </Button>
+              </div>
+              <label
+                v-else
+                class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors"
+                :class="fileDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary hover:bg-primary/5'"
+                @dragover.prevent="fileDragOver = true"
+                @dragleave.prevent="fileDragOver = false"
+                @drop="handleFileDrop"
+              >
+                <Upload class="h-8 w-8 text-muted-foreground" />
+                <p class="mt-2 text-sm text-muted-foreground">点击或拖拽上传模型文件</p>
+                <p class="text-xs text-muted-foreground">支持 .ysm, .zip 格式，最大 100MB</p>
+                <Input id="file" type="file" accept=".ysm,.zip" class="hidden" @change="handleFileChange" />
+              </label>
             </div>
 
             <div class="space-y-2">
               <Label>预览图（可选）</Label>
-              <p class="text-sm text-muted-foreground">支持 jpg, png, gif 格式，最大 5MB</p>
+              <p class="text-xs text-muted-foreground">支持 jpg, png, gif 格式，最大 5MB</p>
               <div v-if="imagePreview" class="relative inline-block">
-                <img :src="imagePreview" class="h-40 w-auto rounded-md object-cover" />
+                <img :src="imagePreview" class="aspect-[4/3] w-64 rounded-lg object-cover" />
                 <Button
                   type="button"
                   variant="destructive"
                   size="icon"
-                  class="absolute right-2 top-2 h-6 w-6"
+                  class="focus-ring btn-press absolute right-2 top-2 h-7 w-7"
+                  aria-label="移除预览图"
                   @click="removeImage"
                 >
                   <X class="h-4 w-4" />
                 </Button>
               </div>
-              <Input v-else type="file" accept="image/*" @change="handleImageChange" />
+              <label
+                v-else
+                class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors"
+                :class="imageDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary hover:bg-primary/5'"
+                @dragover.prevent="imageDragOver = true"
+                @dragleave.prevent="imageDragOver = false"
+                @drop="handleImageDrop"
+              >
+                <ImageOff class="h-8 w-8 text-muted-foreground" />
+                <p class="mt-2 text-sm text-muted-foreground">点击或拖拽上传预览图</p>
+                <p class="text-xs text-muted-foreground">支持 JPG、PNG、GIF、WEBP</p>
+                <Input type="file" accept="image/*" class="hidden" @change="handleImageChange" />
+              </label>
             </div>
 
-            <div v-if="submitting && uploadProgress > 0" class="space-y-2">
-              <div class="flex justify-between text-sm">
-                <span>上传进度</span>
-                <span>{{ uploadProgress }}%</span>
-              </div>
-              <div class="h-2 bg-muted rounded-full overflow-hidden">
-                <div 
-                  class="h-full bg-primary transition-all duration-300"
-                  :style="{ width: uploadProgress + '%' }"
-                ></div>
-              </div>
-            </div>
+            <Progress
+              v-if="submitting && uploadProgress > 0"
+              :model-value="uploadProgress"
+              :max="100"
+              show-value
+              size="lg"
+            >
+              <span>上传进度</span>
+            </Progress>
 
-            <Button type="submit" class="w-full" :disabled="submitting">
-              <Loader2 v-if="submitting" class="mr-2 h-4 w-4 animate-spin" />
-              <Upload v-else class="mr-2 h-4 w-4" />
+            <Button type="submit" class="focus-ring btn-press w-full sm:w-auto" :loading="submitting">
+              <Upload v-if="!submitting" class="mr-2 h-4 w-4" />
               {{ submitting ? '上传中...' : '上传新版本' }}
             </Button>
           </form>

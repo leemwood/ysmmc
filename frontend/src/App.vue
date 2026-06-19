@@ -18,7 +18,7 @@ onMounted(async () => {
 <template>
   <div class="flex min-h-screen flex-col">
     <AppNavbar />
-    <main class="flex-1">
+    <main class="min-h-[calc(100vh-4rem)] flex-1">
       <RouterView v-slot="{ Component }">
         <Transition name="page" mode="out-in">
           <component :is="Component" />

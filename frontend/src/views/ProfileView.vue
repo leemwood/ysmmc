@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { userApi, modelApi, favoriteApi, uploadApi, authApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import type { Model, Favorite, PaginatedResponse } from '@/types'
@@ -11,17 +11,35 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
-import { RouterLink } from 'vue-router'
+import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { User, Save, Loader2, Heart, Package, Camera, Key, Mail } from 'lucide-vue-next'
-import { getAvatarUrl, getModelImageUrl } from '@/utils/image'
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { RouterLink } from 'vue-router'
+import ModelCard from '@/components/ModelCard.vue'
+import {
+  User,
+  Save,
+  Loader2,
+  Heart,
+  Package,
+  Camera,
+  Key,
+  Mail,
+  UploadCloud,
+  Inbox,
+  AlertCircle,
+  Pencil,
+} from 'lucide-vue-next'
+import { getAvatarUrl } from '@/utils/image'
 
 const authStore = useAuthStore()
 
@@ -34,22 +52,34 @@ const favorites = ref<Favorite[]>([])
 const loadingModels = ref(true)
 const loadingFavorites = ref(true)
 const message = ref('')
+const messageType = ref<'success' | 'error'>('success')
 
 const avatarFile = ref<File | null>(null)
 const avatarPreview = ref<string | null>(null)
 const uploadingAvatar = ref(false)
+const uploadProgress = ref(0)
+const isDragging = ref(false)
 
-const passwordDialog = ref(false)
+const passwordSheet = ref(false)
 const oldPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
 const changingPassword = ref(false)
 const passwordMessage = ref('')
 
-const emailDialog = ref(false)
+const emailSheet = ref(false)
 const newEmail = ref('')
 const changingEmail = ref(false)
 const emailMessage = ref('')
+
+const isMobile = ref(false)
+let resizeHandler: (() => void) | null = null
+
+const sheetSide = computed(() => (isMobile.value ? 'bottom' : 'right'))
+
+function checkMobile() {
+  isMobile.value = window.innerWidth < 640
+}
 
 async function loadProfile() {
   if (authStore.user) {
@@ -83,6 +113,11 @@ async function loadFavorites() {
   }
 }
 
+function setMessage(text: string, type: 'success' | 'error' = 'success') {
+  message.value = text
+  messageType.value = type
+}
+
 async function handleUpdateProfile() {
   loading.value = true
   message.value = ''
@@ -93,13 +128,9 @@ async function handleUpdateProfile() {
       bio: bio.value,
     })
     await authStore.fetchUser()
-    if (authStore.isAdmin) {
-      message.value = '资料更新成功'
-    } else {
-      message.value = '资料更新已提交审核'
-    }
+    setMessage(authStore.isAdmin ? '资料更新成功' : '资料更新已提交审核')
   } catch (error: any) {
-    message.value = error.response?.data?.message || '更新失败'
+    setMessage(error.response?.data?.message || '更新失败', 'error')
   } finally {
     loading.value = false
   }
@@ -107,28 +138,60 @@ async function handleUpdateProfile() {
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024
 
+function validateAvatarFile(file: File): boolean {
+  if (file.size > MAX_AVATAR_SIZE) {
+    setMessage('图片大小不能超过2MB', 'error')
+    return false
+  }
+
+  if (!file.type.startsWith('image/')) {
+    setMessage('请选择有效的图片文件', 'error')
+    return false
+  }
+
+  return true
+}
+
+function readAvatarFile(file: File) {
+  avatarFile.value = file
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    avatarPreview.value = e.target?.result as string
+  }
+  reader.readAsDataURL(file)
+  message.value = ''
+}
+
 function handleAvatarChange(event: Event) {
   const target = event.target as HTMLInputElement
   if (target.files && target.files[0]) {
     const file = target.files[0]
-    
-    if (file.size > MAX_AVATAR_SIZE) {
-      message.value = '图片大小不能超过2MB'
-      return
+    if (validateAvatarFile(file)) {
+      readAvatarFile(file)
     }
-    
-    if (!file.type.startsWith('image/')) {
-      message.value = '请选择有效的图片文件'
-      return
+    target.value = ''
+  }
+}
+
+function handleDragOver(event: DragEvent) {
+  event.preventDefault()
+  isDragging.value = true
+}
+
+function handleDragLeave(event: DragEvent) {
+  event.preventDefault()
+  isDragging.value = false
+}
+
+function handleDrop(event: DragEvent) {
+  event.preventDefault()
+  isDragging.value = false
+  const files = event.dataTransfer?.files
+  if (files && files[0]) {
+    const file = files[0]
+    if (validateAvatarFile(file)) {
+      readAvatarFile(file)
     }
-    
-    avatarFile.value = file
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      avatarPreview.value = e.target?.result as string
-    }
-    reader.readAsDataURL(avatarFile.value)
-    message.value = ''
   }
 }
 
@@ -136,6 +199,14 @@ async function uploadAvatar() {
   if (!avatarFile.value) return
 
   uploadingAvatar.value = true
+  uploadProgress.value = 0
+  const progressInterval = window.setInterval(() => {
+    if (uploadProgress.value < 90) {
+      uploadProgress.value += Math.floor(Math.random() * 10) + 5
+      if (uploadProgress.value > 90) uploadProgress.value = 90
+    }
+  }, 200)
+
   try {
     const uploadResponse = await uploadApi.uploadImage(avatarFile.value)
     const avatarId = uploadResponse.data.data?.file_id
@@ -145,21 +216,32 @@ async function uploadAvatar() {
       await authStore.fetchUser()
       avatarFile.value = null
       avatarPreview.value = null
-      message.value = '头像更新成功'
+      setMessage('头像更新成功')
     }
   } catch (error: any) {
-    message.value = error.response?.data?.message || '头像上传失败'
+    setMessage(error.response?.data?.message || '头像上传失败', 'error')
   } finally {
+    window.clearInterval(progressInterval)
+    uploadProgress.value = 100
     uploadingAvatar.value = false
+    window.setTimeout(() => {
+      uploadProgress.value = 0
+    }, 500)
   }
 }
 
-function openPasswordDialog() {
+function cancelAvatarUpload() {
+  avatarPreview.value = null
+  avatarFile.value = null
+  uploadProgress.value = 0
+}
+
+function openPasswordSheet() {
   oldPassword.value = ''
   newPassword.value = ''
   confirmPassword.value = ''
   passwordMessage.value = ''
-  passwordDialog.value = true
+  passwordSheet.value = true
 }
 
 async function changePassword() {
@@ -184,8 +266,8 @@ async function changePassword() {
       old_password: oldPassword.value,
       new_password: newPassword.value,
     })
-    passwordDialog.value = false
-    message.value = '密码修改成功'
+    passwordSheet.value = false
+    setMessage('密码修改成功')
   } catch (error: any) {
     passwordMessage.value = error.response?.data?.message || '密码修改失败'
   } finally {
@@ -193,10 +275,10 @@ async function changePassword() {
   }
 }
 
-function openEmailDialog() {
+function openEmailSheet() {
   newEmail.value = ''
   emailMessage.value = ''
-  emailDialog.value = true
+  emailSheet.value = true
 }
 
 async function changeEmail() {
@@ -214,8 +296,8 @@ async function changeEmail() {
   changingEmail.value = true
   try {
     await authApi.changeEmail(newEmail.value)
-    emailDialog.value = false
-    message.value = '验证邮件已发送到新邮箱，请查收'
+    emailSheet.value = false
+    setMessage('验证邮件已发送到新邮箱，请查收')
   } catch (error: any) {
     emailMessage.value = error.response?.data?.message || '发送失败'
   } finally {
@@ -224,255 +306,269 @@ async function changeEmail() {
 }
 
 onMounted(() => {
+  checkMobile()
+  resizeHandler = checkMobile
+  window.addEventListener('resize', resizeHandler)
   loadProfile()
   loadModels()
   loadFavorites()
+})
+
+onUnmounted(() => {
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+  }
 })
 </script>
 
 <template>
   <div class="mx-auto max-w-4xl px-4 py-6 sm:py-8">
-    <div class="mb-6 flex gap-1 sm:gap-4 border-b overflow-x-auto">
-      <button
-        class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0"
-        :class="activeTab === 'profile' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-        @click="activeTab = 'profile'"
-      >
-        <User class="h-4 w-4" />
-        <span class="hidden sm:inline">个人资料</span>
-        <span class="sm:hidden">资料</span>
-      </button>
-      <button
-        class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0"
-        :class="activeTab === 'models' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-        @click="activeTab = 'models'"
-      >
-        <Package class="h-4 w-4" />
-        <span class="hidden sm:inline">我的模型</span>
-        <span class="sm:hidden">模型</span>
-      </button>
-      <button
-        class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0"
-        :class="activeTab === 'favorites' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
-        @click="activeTab = 'favorites'"
-      >
-        <Heart class="h-4 w-4" />
-        <span class="hidden sm:inline">我的收藏</span>
-        <span class="sm:hidden">收藏</span>
-      </button>
-    </div>
+    <Tabs v-model="activeTab" class="mb-6">
+      <TabsList class="grid h-auto w-full grid-cols-3 p-1 sm:h-10 sm:w-auto sm:inline-grid">
+        <TabsTrigger value="profile" class="flex items-center justify-center gap-2 py-2.5 sm:py-1.5">
+          <User class="h-4 w-4" />
+          <span class="hidden sm:inline">个人资料</span>
+          <span class="sm:hidden">资料</span>
+        </TabsTrigger>
+        <TabsTrigger value="models" class="flex items-center justify-center gap-2 py-2.5 sm:py-1.5">
+          <Package class="h-4 w-4" />
+          <span class="hidden sm:inline">我的模型</span>
+          <span class="sm:hidden">模型</span>
+        </TabsTrigger>
+        <TabsTrigger value="favorites" class="flex items-center justify-center gap-2 py-2.5 sm:py-1.5">
+          <Heart class="h-4 w-4" />
+          <span class="hidden sm:inline">我的收藏</span>
+          <span class="sm:hidden">收藏</span>
+        </TabsTrigger>
+      </TabsList>
 
-    <div v-if="activeTab === 'profile'">
-      <Card>
-        <CardHeader>
-          <CardTitle>个人资料</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form @submit.prevent="handleUpdateProfile" class="space-y-4">
-            <div v-if="message" class="rounded-md bg-primary/10 p-3 text-sm text-primary animate-fade-in">
-              {{ message }}
-            </div>
+      <TabsContent value="profile" class="animate-fade-in focus-visible:outline-none">
+        <Card>
+          <CardHeader>
+            <CardTitle>个人资料</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form @submit.prevent="handleUpdateProfile" class="space-y-5">
+              <Alert v-if="message" :variant="messageType === 'error' ? 'destructive' : 'default'" class="animate-fade-in">
+                <AlertCircle class="h-4 w-4" />
+                <AlertDescription>{{ message }}</AlertDescription>
+              </Alert>
 
-            <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-              <div class="relative group self-center sm:self-start">
-                <Avatar class="h-20 w-20 sm:h-24 sm:w-24">
-                  <AvatarImage v-if="avatarPreview || authStore.user?.avatar_id || authStore.user?.avatar_url" :src="avatarPreview || getAvatarUrl(authStore.user?.avatar_id, authStore.user?.avatar_url) || undefined">
-                    <User class="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground" />
-                  </AvatarImage>
-                </Avatar>
-                <label class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-                  <Camera class="h-6 w-6 text-white" />
-                  <input type="file" accept="image/*" class="hidden" @change="handleAvatarChange" />
-                </label>
-              </div>
-              <div class="flex-1 space-y-3 text-center sm:text-left">
-                <div v-if="avatarPreview" class="flex gap-2 justify-center sm:justify-start">
-                  <Button size="sm" @click="uploadAvatar" :disabled="uploadingAvatar" class="h-9">
-                    <Loader2 v-if="uploadingAvatar" class="mr-2 h-4 w-4 animate-spin" />
-                    保存头像
-                  </Button>
-                  <Button size="sm" variant="outline" @click="avatarPreview = null; avatarFile = null" class="h-9">
-                    取消
-                  </Button>
+              <div class="flex flex-col items-start gap-4 sm:flex-row sm:gap-6">
+                <div
+                  class="group relative self-center sm:self-start"
+                  :class="[
+                    'rounded-full border-2 border-dashed p-1 transition-colors',
+                    isDragging ? 'border-primary bg-primary/5' : 'border-transparent',
+                  ]"
+                  @dragover="handleDragOver"
+                  @dragleave="handleDragLeave"
+                  @drop="handleDrop"
+                >
+                  <Avatar class="h-24 w-24 sm:h-28 sm:w-28">
+                    <AvatarImage v-if="avatarPreview || authStore.user?.avatar_id || authStore.user?.avatar_url" :src="avatarPreview || getAvatarUrl(authStore.user?.avatar_id, authStore.user?.avatar_url) || undefined">
+                      <User class="h-12 w-12 text-muted-foreground" />
+                    </AvatarImage>
+                    <div v-else class="flex h-full w-full items-center justify-center bg-muted">
+                      <User class="h-12 w-12 text-muted-foreground" />
+                    </div>
+                  </Avatar>
+                  <label
+                    class="absolute inset-0 m-1 flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+                  >
+                    <Camera class="h-6 w-6 text-white" />
+                    <input type="file" accept="image/*" class="hidden" @change="handleAvatarChange" />
+                  </label>
                 </div>
-                <p class="text-sm text-muted-foreground">点击头像更换图片</p>
-              </div>
-            </div>
-
-            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 pt-2">
-              <div>
-                <p class="font-medium">{{ authStore.user?.username }}</p>
-                <p class="text-sm text-muted-foreground">{{ authStore.user?.email }}</p>
-                <div class="flex items-center gap-2 mt-1 flex-wrap">
-                  <Badge v-if="authStore.user?.role === 'super_admin'" variant="default">站长</Badge>
-                  <Badge v-else-if="authStore.isAdmin" variant="secondary">管理员</Badge>
-                  <Badge v-if="authStore.user?.email_verified" variant="outline" class="text-green-600">已验证</Badge>
-                </div>
-              </div>
-            </div>
-
-            <div class="space-y-2">
-              <Label for="username">用户名</Label>
-              <Input id="username" v-model="username" placeholder="请输入用户名" class="h-11" />
-            </div>
-
-            <div class="space-y-2">
-              <Label for="bio">个人简介</Label>
-              <Textarea id="bio" v-model="bio" placeholder="介绍一下自己..." :rows="3" class="min-h-[80px]" />
-            </div>
-
-            <div v-if="authStore.user?.profile_status === 'pending_review'" class="rounded-md bg-yellow-500/10 p-3 text-sm text-yellow-600">
-              资料修改正在审核中
-            </div>
-
-            <div class="flex flex-col sm:flex-row gap-2">
-              <Button type="submit" :disabled="loading" class="btn-press h-9 sm:flex-1">
-                <Loader2 v-if="loading" class="mr-2 h-4 w-4 animate-spin" />
-                <Save v-else class="mr-2 h-4 w-4" />
-                保存修改
-              </Button>
-              <Button type="button" variant="outline" @click="openPasswordDialog" class="btn-press h-9 sm:flex-1">
-                <Key class="mr-2 h-4 w-4" />
-                修改密码
-              </Button>
-              <Button type="button" variant="outline" @click="openEmailDialog" class="btn-press h-9 sm:flex-1">
-                <Mail class="mr-2 h-4 w-4" />
-                修改邮箱
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-
-    <div v-else-if="activeTab === 'models'">
-      <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-lg sm:text-xl font-semibold">我的模型</h2>
-        <RouterLink to="/upload">
-          <Button size="sm" class="btn-press h-9">上传模型</Button>
-        </RouterLink>
-      </div>
-
-      <div v-if="loadingModels" class="grid gap-4 grid-cols-1 sm:grid-cols-2">
-        <Skeleton v-for="i in 4" :key="i" class="h-32" />
-      </div>
-
-      <div v-else-if="models.length === 0" class="text-center py-12 text-muted-foreground">
-        暂无模型，<RouterLink to="/upload" class="text-primary hover:underline">去上传</RouterLink>
-      </div>
-
-      <div v-else class="grid gap-4 grid-cols-1 sm:grid-cols-2">
-        <Card v-for="model in models" :key="model.id" class="card-hover">
-          <CardContent class="p-4">
-            <div class="flex items-start gap-4">
-              <div class="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 rounded bg-muted overflow-hidden">
-                <img v-if="model.image_id || model.image_url" :src="getModelImageUrl(model.image_id, model.image_url)" class="h-full w-full object-cover rounded" />
-              </div>
-              <div class="flex-1 min-w-0">
-                <RouterLink :to="`/model/${model.id}`" class="font-medium hover:underline line-clamp-1">
-                  {{ model.title }}
-                </RouterLink>
-                <div class="mt-1 flex items-center gap-2 flex-wrap">
-                  <Badge :variant="model.status === 'approved' ? 'success' : model.status === 'rejected' ? 'destructive' : 'secondary'" class="text-xs">
-                    {{ model.status === 'approved' ? '已通过' : model.status === 'rejected' ? '已拒绝' : '审核中' }}
-                  </Badge>
-                  <span class="text-xs text-muted-foreground">{{ model.downloads }} 下载</span>
+                <div class="flex-1 space-y-3 text-center sm:text-left">
+                  <div class="text-sm text-muted-foreground">
+                    <p class="flex items-center justify-center gap-1 sm:justify-start">
+                      <UploadCloud class="h-4 w-4" />
+                      点击头像或拖拽图片到此处上传
+                    </p>
+                    <p class="text-xs">支持 JPG、PNG、GIF、WEBP，最大 2MB</p>
+                  </div>
+                  <div v-if="avatarPreview" class="flex flex-col gap-2">
+                    <div class="flex gap-2 justify-center sm:justify-start">
+                      <Button size="sm" @click="uploadAvatar" :disabled="uploadingAvatar" class="h-9">
+                        <Loader2 v-if="uploadingAvatar" class="mr-2 h-4 w-4 animate-spin" />
+                        保存头像
+                      </Button>
+                      <Button size="sm" variant="outline" @click="cancelAvatarUpload" :disabled="uploadingAvatar" class="h-9">
+                        取消
+                      </Button>
+                    </div>
+                    <Progress v-if="uploadingAvatar" :model-value="uploadProgress" :max="100" show-value class="max-w-xs" />
+                  </div>
                 </div>
               </div>
-            </div>
+
+              <div class="flex flex-col items-start gap-2 pt-2 sm:flex-row sm:items-center sm:gap-4">
+                <div class="text-center sm:text-left">
+                  <p class="font-medium">{{ authStore.user?.username }}</p>
+                  <p class="text-sm text-muted-foreground">{{ authStore.user?.email }}</p>
+                  <div class="mt-1 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                    <Badge v-if="authStore.user?.role === 'super_admin'" variant="default">站长</Badge>
+                    <Badge v-else-if="authStore.isAdmin" variant="secondary">管理员</Badge>
+                    <Badge v-if="authStore.user?.email_verified" variant="outline" class="text-green-600">已验证</Badge>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div class="space-y-2">
+                <Label for="username">用户名</Label>
+                <Input id="username" v-model="username" placeholder="请输入用户名" class="h-11" />
+              </div>
+
+              <div class="space-y-2">
+                <Label for="bio">个人简介</Label>
+                <Textarea id="bio" v-model="bio" placeholder="介绍一下自己..." :rows="3" class="min-h-[80px]" />
+              </div>
+
+              <Alert v-if="authStore.user?.profile_status === 'pending_review'" variant="default" class="animate-fade-in border-yellow-500/50 text-yellow-600 dark:text-yellow-400 [&>svg]:text-yellow-600 dark:[&>svg]:text-yellow-400">
+                <AlertCircle class="h-4 w-4" />
+                <AlertDescription>资料修改正在审核中，审核通过前对外展示的信息不会更新。</AlertDescription>
+              </Alert>
+
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <Button type="submit" :disabled="loading" :loading="loading" class="btn-press h-10 w-full sm:flex-1">
+                  <Save v-if="!loading" class="mr-2 h-4 w-4" />
+                  保存修改
+                </Button>
+                <Button type="button" variant="outline" @click="openPasswordSheet" class="btn-press h-10 w-full sm:flex-1">
+                  <Key class="mr-2 h-4 w-4" />
+                  修改密码
+                </Button>
+                <Button type="button" variant="outline" @click="openEmailSheet" class="btn-press h-10 w-full sm:flex-1">
+                  <Mail class="mr-2 h-4 w-4" />
+                  修改邮箱
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
-      </div>
-    </div>
+      </TabsContent>
 
-    <div v-else-if="activeTab === 'favorites'">
-      <h2 class="mb-4 text-lg sm:text-xl font-semibold">我的收藏</h2>
-
-      <div v-if="loadingFavorites" class="grid gap-4 grid-cols-1 sm:grid-cols-2">
-        <Skeleton v-for="i in 4" :key="i" class="h-32" />
-      </div>
-
-      <div v-else-if="favorites.length === 0" class="text-center py-12 text-muted-foreground">
-        暂无收藏
-      </div>
-
-      <div v-else class="grid gap-4 grid-cols-1 sm:grid-cols-2">
-        <Card v-for="favorite in favorites" :key="favorite.id" class="card-hover">
-          <CardContent class="p-4">
-            <div class="flex items-start gap-4">
-              <div class="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 rounded bg-muted overflow-hidden">
-                <img v-if="favorite.model?.image_id || favorite.model?.image_url" :src="getModelImageUrl(favorite.model?.image_id, favorite.model?.image_url)" class="h-full w-full object-cover rounded" />
-              </div>
-              <div class="flex-1 min-w-0">
-                <RouterLink :to="`/model/${favorite.model_id}`" class="font-medium hover:underline line-clamp-1">
-                  {{ favorite.model?.title }}
-                </RouterLink>
-                <p class="mt-1 text-xs text-muted-foreground">
-                  {{ favorite.model?.downloads || 0 }} 下载
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-
-    <Dialog v-model:open="passwordDialog">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>修改密码</DialogTitle>
-          <DialogDescription>请输入旧密码和新密码</DialogDescription>
-        </DialogHeader>
-        <div class="space-y-4">
-          <div class="space-y-2">
-            <Label>旧密码</Label>
-            <Input v-model="oldPassword" type="password" placeholder="请输入旧密码" class="h-11" />
-          </div>
-          <div class="space-y-2">
-            <Label>新密码</Label>
-            <Input v-model="newPassword" type="password" placeholder="请输入新密码（至少6位）" class="h-11" />
-          </div>
-          <div class="space-y-2">
-            <Label>确认密码</Label>
-            <Input v-model="confirmPassword" type="password" placeholder="请再次输入新密码" class="h-11" />
-          </div>
-          <div v-if="passwordMessage" class="text-sm text-destructive">{{ passwordMessage }}</div>
+      <TabsContent value="models" class="animate-fade-in focus-visible:outline-none">
+        <div class="mb-4 flex items-center justify-between">
+          <h2 class="text-lg font-semibold sm:text-xl">我的模型</h2>
+          <RouterLink to="/upload">
+            <Button size="sm" class="btn-press h-9">上传模型</Button>
+          </RouterLink>
         </div>
-        <DialogFooter>
-          <Button variant="outline" @click="passwordDialog = false" class="h-9">取消</Button>
-          <Button @click="changePassword" :disabled="changingPassword" class="h-9">
-            <Loader2 v-if="changingPassword" class="mr-2 h-4 w-4 animate-spin" />
+
+        <div v-if="loadingModels" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Skeleton v-for="i in 4" :key="i" class="h-48" />
+        </div>
+
+        <div v-else-if="models.length === 0" class="surface flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+          <Inbox class="h-12 w-12 text-muted-foreground opacity-50" />
+          <p class="mt-4 text-muted-foreground">暂无模型</p>
+          <RouterLink to="/upload" class="mt-2 text-primary hover:underline">去上传第一个模型</RouterLink>
+        </div>
+
+        <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div v-for="model in models" :key="model.id" class="relative group">
+            <ModelCard :model="model" />
+            <RouterLink
+              :to="`/model/${model.id}/edit`"
+              class="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-md bg-background/90 text-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 focus:opacity-100 focus-ring"
+              :aria-label="`编辑 ${model.title}`"
+            >
+              <Pencil class="h-4 w-4" />
+            </RouterLink>
+          </div>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="favorites" class="animate-fade-in focus-visible:outline-none">
+        <h2 class="mb-4 text-lg font-semibold sm:text-xl">我的收藏</h2>
+
+        <div v-if="loadingFavorites" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Skeleton v-for="i in 4" :key="i" class="h-48" />
+        </div>
+
+        <div v-else-if="favorites.length === 0" class="surface flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+          <Heart class="h-12 w-12 text-muted-foreground opacity-50" />
+          <p class="mt-4 text-muted-foreground">暂无收藏</p>
+          <RouterLink to="/" class="mt-2 text-primary hover:underline">去发现模型</RouterLink>
+        </div>
+
+        <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <template v-for="favorite in favorites" :key="favorite.id">
+            <ModelCard v-if="favorite.model" :model="favorite.model" />
+            <Card v-else class="flex items-center justify-center p-4 text-center">
+              <CardContent>
+                <p class="text-sm text-muted-foreground">模型信息不可用</p>
+              </CardContent>
+            </Card>
+          </template>
+        </div>
+      </TabsContent>
+    </Tabs>
+
+    <Sheet v-model:open="passwordSheet">
+      <SheetContent :side="sheetSide" class="sm:max-w-sm">
+        <SheetHeader>
+          <SheetTitle>修改密码</SheetTitle>
+          <SheetDescription>请输入旧密码和新密码</SheetDescription>
+        </SheetHeader>
+        <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <Label for="old-password">旧密码</Label>
+            <Input id="old-password" v-model="oldPassword" type="password" placeholder="请输入旧密码" class="h-11" />
+          </div>
+          <div class="space-y-2">
+            <Label for="new-password">新密码</Label>
+            <Input id="new-password" v-model="newPassword" type="password" placeholder="请输入新密码（至少6位）" class="h-11" />
+          </div>
+          <div class="space-y-2">
+            <Label for="confirm-password">确认密码</Label>
+            <Input id="confirm-password" v-model="confirmPassword" type="password" placeholder="请再次输入新密码" class="h-11" />
+          </div>
+          <Alert v-if="passwordMessage" variant="destructive" class="animate-fade-in">
+            <AlertCircle class="h-4 w-4" />
+            <AlertDescription>{{ passwordMessage }}</AlertDescription>
+          </Alert>
+        </div>
+        <SheetFooter class="flex-col-reverse sm:flex-row">
+          <Button variant="outline" @click="passwordSheet = false" class="h-10 w-full sm:w-auto">取消</Button>
+          <Button @click="changePassword" :loading="changingPassword" class="h-10 w-full sm:w-auto">
             确认修改
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
 
-    <Dialog v-model:open="emailDialog">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>修改邮箱</DialogTitle>
-          <DialogDescription>新邮箱需要验证后才能生效</DialogDescription>
-        </DialogHeader>
-        <div class="space-y-4">
+    <Sheet v-model:open="emailSheet">
+      <SheetContent :side="sheetSide" class="sm:max-w-sm">
+        <SheetHeader>
+          <SheetTitle>修改邮箱</SheetTitle>
+          <SheetDescription>新邮箱需要验证后才能生效</SheetDescription>
+        </SheetHeader>
+        <div class="space-y-4 py-4">
           <div class="space-y-2">
-            <Label>当前邮箱</Label>
-            <Input :model-value="authStore.user?.email" disabled class="h-11" />
+            <Label for="current-email">当前邮箱</Label>
+            <Input id="current-email" :model-value="authStore.user?.email" disabled class="h-11" />
           </div>
           <div class="space-y-2">
-            <Label>新邮箱</Label>
-            <Input v-model="newEmail" type="email" placeholder="请输入新邮箱地址" class="h-11" />
+            <Label for="new-email">新邮箱</Label>
+            <Input id="new-email" v-model="newEmail" type="email" placeholder="请输入新邮箱地址" class="h-11" />
           </div>
-          <div v-if="emailMessage" class="text-sm text-destructive">{{ emailMessage }}</div>
+          <Alert v-if="emailMessage" variant="destructive" class="animate-fade-in">
+            <AlertCircle class="h-4 w-4" />
+            <AlertDescription>{{ emailMessage }}</AlertDescription>
+          </Alert>
         </div>
-        <DialogFooter>
-          <Button variant="outline" @click="emailDialog = false" class="h-9">取消</Button>
-          <Button @click="changeEmail" :disabled="changingEmail" class="h-9">
-            <Loader2 v-if="changingEmail" class="mr-2 h-4 w-4 animate-spin" />
+        <SheetFooter class="flex-col-reverse sm:flex-row">
+          <Button variant="outline" @click="emailSheet = false" class="h-10 w-full sm:w-auto">取消</Button>
+          <Button @click="changeEmail" :loading="changingEmail" class="h-10 w-full sm:w-auto">
             发送验证邮件
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   </div>
 </template>

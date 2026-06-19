@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { cva, type VariantProps } from 'class-variance-authority'
+import { Loader2 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
@@ -37,19 +38,22 @@ interface Props {
   class?: string
   disabled?: boolean
   type?: 'button' | 'submit' | 'reset'
+  loading?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   variant: 'default',
   size: 'default',
   type: 'button',
+  loading: false,
 })
 
 const classes = computed(() => cn(buttonVariants({ variant: props.variant, size: props.size }), props.class))
 </script>
 
 <template>
-  <button :class="classes" :disabled="disabled" :type="type">
+  <button :class="classes" :disabled="disabled || loading" :type="type">
+    <Loader2 v-if="loading" class="mr-2 h-4 w-4 animate-spin" />
     <slot />
   </button>
 </template>

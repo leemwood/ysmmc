@@ -4,11 +4,11 @@ import { useRouter } from 'vue-router'
 import { adminApi } from '@/lib/api'
 import type { Model, PaginatedResponse } from '@/types'
 import AdminLayout from '@/components/admin/AdminLayout.vue'
+import ResponsiveTable from '@/components/admin/ResponsiveTable.vue'
+import type { ColumnConfig } from '@/components/admin/ResponsiveTable.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,14 @@ const statusOptions = [
   { value: 'pending', label: '待审核' },
   { value: 'approved', label: '已通过' },
   { value: 'rejected', label: '已拒绝' },
+]
+
+const modelColumns: ColumnConfig<Model>[] = [
+  { key: 'model', title: '模型' },
+  { key: 'status', title: '状态', width: '100px' },
+  { key: 'author', title: '作者', width: '140px' },
+  { key: 'created_at', title: '发布时间', width: '120px', formatter: (row) => new Date(row.created_at).toLocaleDateString('zh-CN') },
+  { key: 'actions', title: '操作', align: 'right', width: '140px' },
 ]
 
 async function fetchModels() {
@@ -111,10 +119,6 @@ async function deleteModel() {
   }
 }
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('zh-CN')
-}
-
 function getStatusBadgeVariant(status: string) {
   switch (status) {
     case 'approved':
@@ -146,13 +150,13 @@ onMounted(fetchModels)
 
 <template>
   <AdminLayout title="模型管理" description="管理所有用户上传的模型">
-    <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
+    <div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
       <div class="relative flex-1">
-        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           v-model="search"
           placeholder="搜索模型..."
-          class="pl-10 h-11"
+          class="h-11 pl-10"
           @keyup.enter="handleSearch"
         />
       </div>
@@ -162,7 +166,7 @@ onMounted(fetchModels)
           :key="option.value"
           :variant="statusFilter === option.value ? 'default' : 'outline'"
           size="sm"
-          class="btn-press whitespace-nowrap h-9"
+          class="btn-press h-9 whitespace-nowrap"
           @click="handleStatusChange(option.value)"
         >
           {{ option.label }}
@@ -171,79 +175,77 @@ onMounted(fetchModels)
       <Button class="btn-press h-9" @click="handleSearch">搜索</Button>
     </div>
 
-    <div v-if="loading" class="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      <Card v-for="i in 8" :key="i">
-        <CardContent class="p-4">
-          <Skeleton class="aspect-[4/3] w-full mb-3" />
-          <Skeleton class="h-5 w-3/4 mb-2" />
-          <Skeleton class="h-4 w-1/2" />
-        </CardContent>
-      </Card>
-    </div>
+    <div class="surface p-4 sm:p-6">
+      <ResponsiveTable
+        :columns="modelColumns"
+        :rows="models"
+        :loading="loading"
+        :skeleton-rows="8"
+      >
+        <template #model="{ row }">
+          <div class="flex items-center gap-3 sm:gap-4">
+            <div class="h-14 w-14 flex-shrink-0 overflow-hidden rounded bg-muted sm:h-16 sm:w-16">
+              <img
+                v-if="row.image_id || row.image_url"
+                :src="getModelImageUrl(row.image_id, row.image_url)"
+                :alt="row.title"
+                class="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+              <div v-else class="flex h-full items-center justify-center text-xs text-muted-foreground">
+                无预览
+              </div>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="font-medium line-clamp-1">{{ row.title }}</p>
+              <p class="text-sm text-muted-foreground line-clamp-1">{{ row.description || '暂无描述' }}</p>
+            </div>
+          </div>
+        </template>
 
-    <div v-else-if="models.length === 0" class="text-center py-12 text-muted-foreground">
-      暂无模型数据
-    </div>
+        <template #status="{ row }">
+          <Badge :variant="getStatusBadgeVariant(row.status)" class="text-xs">
+            {{ getStatusLabel(row.status) }}
+          </Badge>
+        </template>
 
-    <div v-else class="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      <Card v-for="m in models" :key="m.id" class="overflow-hidden card-hover">
-        <div class="aspect-[4/3] w-full bg-muted">
-          <img
-            v-if="m.image_id || m.image_url"
-            :src="getModelImageUrl(m.image_id, m.image_url)"
-            :alt="m.title"
-            class="h-full w-full object-cover"
-          />
-          <div v-else class="flex h-full items-center justify-center text-muted-foreground">
-            无预览图
-          </div>
-        </div>
-        <CardContent class="p-3 sm:p-4">
-          <div class="flex items-start justify-between gap-2">
-            <h3 class="font-semibold line-clamp-1 text-sm sm:text-base">{{ m.title }}</h3>
-            <Badge :variant="getStatusBadgeVariant(m.status)" class="text-xs flex-shrink-0">
-              {{ getStatusLabel(m.status) }}
-            </Badge>
-          </div>
-          <p class="mt-1 text-xs sm:text-sm text-muted-foreground line-clamp-2">
-            {{ m.description || '暂无描述' }}
-          </p>
-          <div class="mt-2 text-xs text-muted-foreground">
-            <span>作者: {{ m.user?.username || '未知' }}</span>
-            <span class="mx-2 hidden sm:inline">|</span>
-            <span class="hidden sm:inline">{{ formatDate(m.created_at) }}</span>
-          </div>
-          <div class="mt-3 flex gap-2">
-            <Button variant="outline" size="sm" class="btn-press flex-1" @click="viewModel(m.id)">
+        <template #author="{ row }">
+          <span class="text-sm text-muted-foreground">{{ row.user?.username || '未知' }}</span>
+        </template>
+
+        <template #actions="{ row }">
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="outline" size="sm" class="btn-press" @click="viewModel(row.id)">
               <Eye class="mr-1 h-3 w-3" />
               查看
             </Button>
-            <Button variant="destructive" size="sm" class="btn-press flex-1" @click="confirmDelete(m)">
+            <Button variant="destructive" size="sm" class="btn-press" @click="confirmDelete(row)">
               <Trash2 class="mr-1 h-3 w-3" />
               删除
             </Button>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </template>
+      </ResponsiveTable>
 
-    <div v-if="totalPages > 1" class="mt-4 sm:mt-6 flex items-center justify-center gap-2 sm:gap-4">
-      <Button variant="outline" size="sm" class="btn-press" :disabled="page === 1" @click="prevPage">
-        <ChevronLeft class="h-4 w-4 sm:mr-1" />
-        <span class="hidden sm:inline">上一页</span>
-      </Button>
-      <span class="text-sm text-muted-foreground">
-        <span class="hidden sm:inline">第 {{ page }} / {{ totalPages }} 页，共 {{ total }} 条</span>
-        <span class="sm:hidden">{{ page }} / {{ totalPages }}</span>
-      </span>
-      <Button variant="outline" size="sm" class="btn-press" :disabled="page === totalPages" @click="nextPage">
-        <span class="hidden sm:inline">下一页</span>
-        <ChevronRight class="h-4 w-4 sm:ml-1" />
-      </Button>
+      <div v-if="totalPages > 1" class="mt-4 flex items-center justify-center gap-2 sm:mt-6">
+        <Button variant="outline" size="sm" class="btn-press" :disabled="page === 1" @click="prevPage">
+          <ChevronLeft class="h-4 w-4 sm:mr-1" />
+          <span class="hidden sm:inline">上一页</span>
+        </Button>
+        <span class="text-sm text-muted-foreground">
+          <span class="hidden sm:inline">第 {{ page }} / {{ totalPages }} 页，共 {{ total }} 条</span>
+          <span class="sm:hidden">{{ page }} / {{ totalPages }}</span>
+        </span>
+        <Button variant="outline" size="sm" class="btn-press" :disabled="page === totalPages" @click="nextPage">
+          <span class="hidden sm:inline">下一页</span>
+          <ChevronRight class="h-4 w-4 sm:ml-1" />
+        </Button>
+      </div>
     </div>
 
     <Dialog v-model:open="deleteDialog">
-      <DialogContent>
+      <DialogContent class="max-w-[calc(100%-2rem)] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>确认删除</DialogTitle>
           <DialogDescription>

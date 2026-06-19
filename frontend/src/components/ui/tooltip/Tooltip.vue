@@ -1,0 +1,17 @@
+<script setup lang="ts">
+import { TooltipRoot, useForwardPropsEmits } from 'radix-vue'
+import type { TooltipRootProps } from 'radix-vue'
+
+const props = defineProps<TooltipRootProps>()
+const emits = defineEmits<{
+  (e: 'update:open', value: boolean): void
+}>()
+
+const forwarded = useForwardPropsEmits(props, emits)
+</script>
+
+<template>
+  <TooltipRoot v-bind="forwarded">
+    <slot />
+  </TooltipRoot>
+</template>

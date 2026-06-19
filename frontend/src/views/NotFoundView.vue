@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
+import { Home } from 'lucide-vue-next'
 
 const router = useRouter()
 
@@ -10,12 +11,17 @@ function goHome() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50">
-    <div class="text-center">
-      <h1 class="text-9xl font-bold text-gray-200">404</h1>
-      <h2 class="text-2xl font-semibold text-gray-700 mt-4">页面未找到</h2>
-      <p class="text-gray-500 mt-2">您访问的页面不存在或已被移除</p>
-      <Button class="mt-6" @click="goHome">返回首页</Button>
+  <div class="container-app flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
+    <div class="surface w-full max-w-md animate-fade-in px-6 py-12 text-center">
+      <h1 class="text-8xl font-bold tracking-tighter gradient-text sm:text-9xl">404</h1>
+      <h2 class="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">页面未找到</h2>
+      <p class="mt-2 text-sm text-muted-foreground sm:text-base">
+        您访问的页面不存在或已被移除
+      </p>
+      <Button class="focus-ring btn-press mt-8" @click="goHome">
+        <Home class="mr-2 h-4 w-4" />
+        返回首页
+      </Button>
     </div>
   </div>
 </template>

@@ -3,11 +3,20 @@ import { cn } from '@/lib/utils'
 
 interface Props {
   class?: string
+  variant?: 'default' | 'shimmer'
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  variant: 'default',
+})
 </script>
 
 <template>
-  <div :class="cn('animate-pulse rounded-md bg-primary/10', props.class)" />
+  <div
+    :class="cn(
+      'rounded-md',
+      props.variant === 'shimmer' ? 'animate-shimmer' : 'animate-pulse bg-primary/10',
+      props.class
+    )"
+  />
 </template>

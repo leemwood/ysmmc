@@ -23,24 +23,26 @@ function isActive(to: string) {
 
 <template>
   <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
-    <div v-if="title" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div>
-        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">{{ title }}</h1>
+    <div v-if="title" class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="min-w-0">
+        <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">{{ title }}</h1>
         <p v-if="description" class="mt-1 text-sm text-muted-foreground">{{ description }}</p>
       </div>
-      <slot name="actions"></slot>
+      <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <slot name="actions"></slot>
+      </div>
     </div>
 
     <nav class="-mx-4 px-4 overflow-x-auto">
-      <div class="flex gap-1 sm:gap-4 border-b min-w-max">
+      <div class="flex min-w-max gap-1 border-b sm:gap-4">
         <RouterLink
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
-          class="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+          class="flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap sm:min-w-0 sm:justify-start sm:px-4"
           :class="isActive(item.to) ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
         >
-          <component :is="item.icon" class="h-4 w-4" />
+          <component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
           <span class="hidden sm:inline">{{ item.label }}</span>
         </RouterLink>
       </div>

@@ -76,9 +76,9 @@ onUnmounted(() => {
       leave-to-class="transform translate-y-full opacity-0"
     >
       <div v-if="showPrompt || isIOS">
-        <div class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm" @click="dismissPrompt" />
-        <div class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 z-50">
-          <div class="bg-card/95 backdrop-blur-md border rounded-lg shadow-lg p-4">
+        <div class="fixed inset-0 z-20 bg-black/80 backdrop-blur-sm" @click="dismissPrompt" />
+        <div class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 z-30">
+          <div class="bg-card/95 backdrop-blur-md border rounded-lg shadow-lg p-4 pb-safe">
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1">
                 <h3 class="font-semibold text-sm">安装 YSM 模型站</h3>
