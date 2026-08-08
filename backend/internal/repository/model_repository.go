@@ -40,7 +40,7 @@ func (r *ModelRepository) ClearReferences(id uuid.UUID) error {
 	}).Error
 }
 
-func (r *ModelRepository) ListPublic(page, pageSize int, search string) ([]model.Model, int64, error) {
+func (r *ModelRepository) ListPublic(page, pageSize int, search, sort string) ([]model.Model, int64, error) {
 	var models []model.Model
 	var total int64
 
@@ -53,7 +53,11 @@ func (r *ModelRepository) ListPublic(page, pageSize int, search string) ([]model
 	query.Count(&total)
 
 	offset := (page - 1) * pageSize
-	err := query.Preload("User").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&models).Error
+	order := "created_at DESC"
+	if sort == "hot" {
+		order = "views DESC, downloads DESC, created_at DESC"
+	}
+	err := query.Preload("User").Offset(offset).Limit(pageSize).Order(order).Find(&models).Error
 	return models, total, err
 }
 
@@ -95,6 +99,10 @@ func (r *ModelRepository) ListPendingUpdates(page, pageSize int) ([]model.Model,
 
 func (r *ModelRepository) IncrementDownloads(id uuid.UUID) error {
 	return database.DB.Model(&model.Model{}).Where("id = ?", id).UpdateColumn("downloads", database.DB.Raw("downloads + 1")).Error
+}
+
+func (r *ModelRepository) IncrementViews(id uuid.UUID) error {
+	return database.DB.Model(&model.Model{}).Where("id = ?", id).UpdateColumn("views", database.DB.Raw("views + 1")).Error
 }
 
 func (r *ModelRepository) Count() (int64, error) {

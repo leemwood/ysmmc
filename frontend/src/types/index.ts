@@ -36,6 +36,7 @@ export interface Model {
   update_status: 'idle' | 'pending_review'
   pending_changes: ModelPendingChanges | null
   downloads: number
+  views: number
   rejection_reason: string | null
   current_version_id: string | null
   version_count: number

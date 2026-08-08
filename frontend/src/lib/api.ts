@@ -82,9 +82,9 @@ export const userApi = {
 }
 
 export const modelApi = {
-  list: (page = 1, pageSize = 12, search = '') =>
+  list: (page = 1, pageSize = 12, search = '', sort: 'latest' | 'hot' = 'latest') =>
     api.get<ApiResponse<PaginatedResponse<Model>>>('/models', {
-      params: { page, page_size: pageSize, search },
+      params: { page, page_size: pageSize, search, sort },
     }),
 
   getById: (id: string) =>

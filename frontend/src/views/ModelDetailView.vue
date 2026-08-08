@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   Download,
+  Eye,
   Heart,
   Edit,
   Trash2,
@@ -324,6 +325,10 @@ onMounted(fetchModel)
             <span class="flex items-center gap-1">
               <Calendar class="h-4 w-4" />
               {{ formatDate(model.created_at) }}
+            </span>
+            <span class="flex items-center gap-1">
+              <Eye class="h-4 w-4" />
+              {{ model.views }} 次预览
             </span>
           </div>
         </div>

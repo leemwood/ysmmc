@@ -3,7 +3,7 @@ import { RouterLink } from 'vue-router'
 import type { Model } from '@/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Download, ImageOff } from 'lucide-vue-next'
+import { Download, Eye, ImageOff } from 'lucide-vue-next'
 import { getModelImageUrl } from '@/utils/image'
 
 interface Props {
@@ -57,6 +57,10 @@ function getImageSrc(model: Model): string {
         </div>
         <div class="mt-3 flex items-center justify-between text-xs text-muted-foreground">
           <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1">
+              <Eye class="h-3 w-3" />
+              {{ model.views }}
+            </span>
             <span class="flex items-center gap-1">
               <Download class="h-3 w-3" />
               {{ model.downloads }}

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS models (
     update_status VARCHAR(20) DEFAULT 'idle',
     pending_changes JSONB,
     downloads INTEGER DEFAULT 0,
+    views INTEGER DEFAULT 0,
     rejection_reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -68,6 +69,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS idx_models_user_id ON models(user_id);
 CREATE INDEX IF NOT EXISTS idx_models_status ON models(status);
 CREATE INDEX IF NOT EXISTS idx_models_created_at ON models(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_models_hot ON models(views DESC, downloads DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_model_id ON favorites(model_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

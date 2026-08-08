@@ -16,8 +16,8 @@ import (
 )
 
 type ModelHandler struct {
-	modelService     *service.ModelService
-	favoriteService  *service.FavoriteService
+	modelService    *service.ModelService
+	favoriteService *service.FavoriteService
 }
 
 func NewModelHandler() *ModelHandler {
@@ -31,6 +31,7 @@ func (h *ModelHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "12"))
 	search := c.Query("search")
+	sort := c.DefaultQuery("sort", "latest")
 
 	if page < 1 {
 		page = 1
@@ -39,7 +40,12 @@ func (h *ModelHandler) List(c *gin.Context) {
 		pageSize = 12
 	}
 
-	models, total, err := h.modelService.ListPublic(page, pageSize, search)
+	if sort != "latest" && sort != "hot" {
+		response.BadRequest(c, "sort must be latest or hot")
+		return
+	}
+
+	models, total, err := h.modelService.ListPublic(page, pageSize, search, sort)
 	if err != nil {
 		response.InternalError(c, "failed to fetch models")
 		return
@@ -59,6 +65,12 @@ func (h *ModelHandler) GetByID(c *gin.Context) {
 	if err != nil {
 		response.NotFound(c, "model not found")
 		return
+	}
+
+	if model.Status == "approved" && model.IsPublic {
+		if err := h.modelService.IncrementViews(id); err == nil {
+			model.Views++
+		}
 	}
 
 	result := gin.H{

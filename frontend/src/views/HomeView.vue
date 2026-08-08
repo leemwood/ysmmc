@@ -17,6 +17,7 @@ const announcements = ref<Announcement[]>([])
 const loading = ref(true)
 const loadingMore = ref(false)
 const search = ref('')
+const sort = ref<'latest' | 'hot'>('latest')
 const page = ref(1)
 const pageSize = 12
 const total = ref(0)
@@ -26,7 +27,7 @@ const dismissedAnnouncements = ref<Set<string>>(new Set())
 async function fetchModels() {
   loading.value = true
   try {
-    const response = await modelApi.list(page.value, pageSize, search.value)
+    const response = await modelApi.list(page.value, pageSize, search.value, sort.value)
     const data = response.data.data as PaginatedResponse<Model>
     models.value = data.items
     total.value = data.total
@@ -71,7 +72,7 @@ async function loadMore() {
   loadingMore.value = true
   try {
     const nextPage = page.value + 1
-    const response = await modelApi.list(nextPage, pageSize, search.value)
+    const response = await modelApi.list(nextPage, pageSize, search.value, sort.value)
     const data = response.data.data as PaginatedResponse<Model>
     models.value.push(...data.items)
     page.value = nextPage
@@ -84,6 +85,13 @@ async function loadMore() {
 
 function clearFilters() {
   search.value = ''
+  page.value = 1
+  fetchModels()
+}
+
+function setSort(nextSort: 'latest' | 'hot') {
+  if (sort.value === nextSort) return
+  sort.value = nextSort
   page.value = 1
   fetchModels()
 }
@@ -168,6 +176,24 @@ onMounted(() => {
           <span class="hidden sm:inline">搜索</span>
         </Button>
       </form>
+      <div class="mt-4 flex items-center gap-2" aria-label="模型排序">
+        <Button
+          size="sm"
+          :variant="sort === 'latest' ? 'default' : 'outline'"
+          class="btn-press"
+          @click="setSort('latest')"
+        >
+          最新发布
+        </Button>
+        <Button
+          size="sm"
+          :variant="sort === 'hot' ? 'default' : 'outline'"
+          class="btn-press"
+          @click="setSort('hot')"
+        >
+          热门
+        </Button>
+      </div>
     </div>
 
     <!-- 加载骨架屏 -->

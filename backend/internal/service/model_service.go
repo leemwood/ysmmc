@@ -203,7 +203,7 @@ func (s *ModelService) Delete(modelID, userID uuid.UUID, isAdmin bool) error {
 
 func deleteModelFiles(m *model.Model) error {
 	cfg := config.AppConfig
-	
+
 	// Delete model file
 	if m.FilePath != "" {
 		// FilePath stored in DB is usually the full relative path from upload dir or absolute path
@@ -231,8 +231,8 @@ func deleteModelFiles(m *model.Model) error {
 	return nil
 }
 
-func (s *ModelService) ListPublic(page, pageSize int, search string) ([]model.Model, int64, error) {
-	return s.modelRepo.ListPublic(page, pageSize, search)
+func (s *ModelService) ListPublic(page, pageSize int, search, sort string) ([]model.Model, int64, error) {
+	return s.modelRepo.ListPublic(page, pageSize, search, sort)
 }
 
 func (s *ModelService) ListByUserID(userID uuid.UUID, page, pageSize int) ([]model.Model, int64, error) {
@@ -241,6 +241,10 @@ func (s *ModelService) ListByUserID(userID uuid.UUID, page, pageSize int) ([]mod
 
 func (s *ModelService) IncrementDownloads(id uuid.UUID) error {
 	return s.modelRepo.IncrementDownloads(id)
+}
+
+func (s *ModelService) IncrementViews(id uuid.UUID) error {
+	return s.modelRepo.IncrementViews(id)
 }
 
 func (s *ModelService) Approve(modelID uuid.UUID) error {
