@@ -18,6 +18,8 @@ function copyIndexToRoutes() {
       
       const routes = [
         'login',
+        'auth/nexusmc/callback',
+        'nexusmc-resources',
         'reset-password',
         'update-password',
         'verify-email',

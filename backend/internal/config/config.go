@@ -35,6 +35,13 @@ type Config struct {
 
 	FrontendURL    string
 	AllowedOrigins []string
+
+	NexusMCOAuthBaseURL   string
+	NexusMCSiteAPIBaseURL string
+	NexusMCClientID       string
+	NexusMCClientSecret   string
+	NexusMCRedirectURI    string
+	NexusMCSiteAPIKey     string
 }
 
 var AppConfig *Config
@@ -76,6 +83,13 @@ func LoadConfig() error {
 
 		FrontendURL:    getEnv("FRONTEND_URL", "http://localhost:5173"),
 		AllowedOrigins: parseAllowedOrigins(getEnv("ALLOWED_ORIGINS", "http://localhost:5173")),
+
+		NexusMCOAuthBaseURL:   getEnv("NEXUSMC_OAUTH_BASE_URL", "https://www.nexusmc.cn/api/oauth2"),
+		NexusMCSiteAPIBaseURL: getEnv("NEXUSMC_SITE_API_BASE_URL", "https://www.nexusmc.cn/api/site/v1"),
+		NexusMCClientID:       getEnv("NEXUSMC_OAUTH_CLIENT_ID", ""),
+		NexusMCClientSecret:   getEnv("NEXUSMC_OAUTH_CLIENT_SECRET", ""),
+		NexusMCRedirectURI:    getEnv("NEXUSMC_OAUTH_REDIRECT_URI", "http://localhost:8080/api/auth/nexusmc/callback"),
+		NexusMCSiteAPIKey:     getEnv("NEXUSMC_SITE_API_KEY", ""),
 	}
 
 	return nil

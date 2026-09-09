@@ -20,6 +20,7 @@ func Setup(r *gin.Engine) {
 	announcementHandler := handler.NewAnnouncementHandler()
 	uploadHandler := handler.NewUploadHandler()
 	fileHandler := handler.NewFileHandler()
+	nexusmcHandler := handler.NewNexusMCHandler()
 
 	api := r.Group("/api")
 	{
@@ -126,7 +127,25 @@ func Setup(r *gin.Engine) {
 		}
 	}
 
-	uploads := api.Group("/uploads")
+		nexusmcAuth := api.Group("/auth/nexusmc")
+		{
+			nexusmcAuth.GET("/login", nexusmcHandler.Login)
+			nexusmcAuth.GET("/bind", middleware.Auth(), nexusmcHandler.Bind)
+			nexusmcAuth.GET("/callback", nexusmcHandler.Callback)
+			nexusmcAuth.POST("/unbind", middleware.Auth(), nexusmcHandler.Unbind)
+			nexusmcAuth.GET("/binding", middleware.Auth(), nexusmcHandler.Binding)
+			nexusmcAuth.GET("/me", middleware.Auth(), nexusmcHandler.Me)
+		}
+
+		nexusmc := api.Group("/nexusmc")
+		{
+			nexusmc.GET("/resources", nexusmcHandler.Resources)
+			nexusmc.GET("/resources/categories", nexusmcHandler.ResourceCategories)
+			nexusmc.GET("/resources/filters", nexusmcHandler.ResourceFilters)
+			nexusmc.GET("/resources/:idOrSlug", nexusmcHandler.ResourceDetail)
+		}
+
+		uploads := api.Group("/uploads")
 	{
 		uploads.GET("/images/*filename", uploadHandler.ServeImage)
 		uploads.GET("/models/*filename", uploadHandler.ServeModelFile)

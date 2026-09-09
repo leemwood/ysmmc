@@ -20,6 +20,7 @@ import {
   LogOut,
   LayoutDashboard,
   UserPlus,
+  Boxes,
 } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { getAvatarUrl } from '@/utils/image'
@@ -51,6 +52,7 @@ interface NavLink {
 
 const publicLinks: NavLink[] = [
   { to: '/', label: '首页', icon: Home },
+  { to: '/nexusmc-resources', label: 'Nexus 资源', icon: Boxes },
 ]
 
 const authLinks: NavLink[] = [

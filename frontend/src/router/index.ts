@@ -14,6 +14,17 @@ const routes: RouteRecordRaw[] = [
     meta: { guest: true },
   },
   {
+    path: '/auth/nexusmc/callback',
+    name: 'nexusmc-callback',
+    component: () => import('@/views/NexusMCCallbackView.vue'),
+    meta: { guest: true },
+  },
+  {
+    path: '/nexusmc-resources',
+    name: 'nexusmc-resources',
+    component: () => import('@/views/NexusResourcesView.vue'),
+  },
+  {
     path: '/reset-password',
     name: 'reset-password',
     component: () => import('@/views/ResetPasswordView.vue'),

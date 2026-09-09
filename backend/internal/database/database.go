@@ -50,6 +50,7 @@ func Migrate() error {
 		&model.Favorite{},
 		&model.Announcement{},
 		&model.Session{},
+		&model.NexusMCBinding{},
 	)
 	if err != nil {
 		log.Printf("Warning: auto migrate error: %v", err)

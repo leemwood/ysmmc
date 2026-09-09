@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { LogIn, UserPlus, Eye, EyeOff } from 'lucide-vue-next'
+import { nexusmcApi } from '@/lib/api'
 import AuthLayout from '@/components/layout/AuthLayout.vue'
 
 const router = useRouter()
@@ -31,6 +32,10 @@ watch(activeTab, () => {
   error.value = ''
   success.value = ''
 })
+
+function loginWithNexusMC() {
+  window.location.href = nexusmcApi.loginUrl()
+}
 
 async function handleSubmit() {
   error.value = ''
@@ -247,5 +252,24 @@ async function handleSubmit() {
         </form>
       </TabsContent>
     </Tabs>
+
+    <div class="mt-6 flex items-center gap-3">
+      <div class="h-px flex-1 bg-border"></div>
+      <span class="text-xs text-muted-foreground">或</span>
+      <div class="h-px flex-1 bg-border"></div>
+    </div>
+
+    <Button
+      type="button"
+      variant="outline"
+      class="mt-4 w-full btn-press h-11"
+      @click="loginWithNexusMC"
+    >
+      <img src="/favicon.svg" class="mr-2 h-4 w-4" alt="" />
+      使用 NexusMC 登录
+    </Button>
+    <p class="mt-2 text-center text-xs text-muted-foreground">
+      首次使用请先用邮箱登录，再到个人中心绑定 NexusMC 账号
+    </p>
   </AuthLayout>
 </template>

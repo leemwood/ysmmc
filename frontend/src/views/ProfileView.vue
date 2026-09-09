@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { userApi, modelApi, favoriteApi, uploadApi, authApi } from '@/lib/api'
+import { userApi, modelApi, favoriteApi, uploadApi, authApi, nexusmcApi } from '@/lib/api'
+import type { NexusMCBinding } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import type { Model, Favorite, PaginatedResponse } from '@/types'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -66,6 +67,33 @@ const newPassword = ref('')
 const confirmPassword = ref('')
 const changingPassword = ref(false)
 const passwordMessage = ref('')
+
+const nexusBinding = ref<NexusMCBinding | null>(null)
+
+async function loadNexusBinding() {
+  try {
+    const res = await nexusmcApi.getBinding()
+    nexusBinding.value = res.data.data ?? null
+  } catch {
+    nexusBinding.value = null
+  }
+}
+
+function bindNexus() {
+  window.location.href = nexusmcApi.bindUrl()
+}
+
+async function unbindNexus() {
+  try {
+    await nexusmcApi.unbind()
+    nexusBinding.value = null
+    message.value = 'NexusMC 账号已解绑'
+    messageType.value = 'success'
+  } catch (err: any) {
+    message.value = err.response?.data?.message || '解绑失败'
+    messageType.value = 'error'
+  }
+}
 
 const emailSheet = ref(false)
 const newEmail = ref('')
@@ -312,6 +340,7 @@ onMounted(() => {
   loadProfile()
   loadModels()
   loadFavorites()
+  loadNexusBinding()
 })
 
 onUnmounted(() => {
@@ -447,6 +476,35 @@ onUnmounted(() => {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card class="mt-6">
+          <CardHeader>
+            <CardTitle>NexusMC 账号绑定</CardTitle>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <div v-if="nexusBinding" class="flex items-center gap-3">
+              <img
+                v-if="nexusBinding.avatar"
+                :src="nexusBinding.avatar.startsWith('http') ? nexusBinding.avatar : 'https://www.nexusmc.cn' + nexusBinding.avatar"
+                :alt="nexusBinding.username"
+                class="h-10 w-10 rounded-full object-cover"
+              />
+              <div class="flex-1">
+                <p class="font-medium">{{ nexusBinding.username }}</p>
+                <p class="text-xs text-muted-foreground">UID {{ nexusBinding.uid }} · 角色 {{ nexusBinding.nexus_role }} · 授权范围 {{ nexusBinding.scope }}</p>
+              </div>
+              <Button type="button" variant="outline" class="btn-press h-9" @click="unbindNexus">
+                解绑
+              </Button>
+            </div>
+            <div v-else class="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm text-muted-foreground">绑定后可使用 NexusMC 账号一键登录，并同步 NexusMC 身份信息</p>
+              <Button type="button" variant="outline" class="btn-press h-9" @click="bindNexus">
+                绑定 NexusMC
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </TabsContent>

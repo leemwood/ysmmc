@@ -305,3 +305,51 @@ export const fileApi = {
 }
 
 export default api
+
+// ---- NexusMC OAuth2 / Site API ----
+
+export interface NexusMCBinding {
+  id: string
+  user_id: string
+  sub: string
+  uid: number
+  username: string
+  slug: string
+  avatar: string
+  nexus_role: string
+  email_verified: boolean
+  scope: string
+  created_at: string
+}
+
+export interface NexusMCResourceQuery {
+  page?: number
+  pageSize?: number
+  platform?: string
+  category?: string
+  subCategory?: string
+  sort?: string
+}
+
+export const nexusmcApi = {
+  loginUrl: () => `${api.defaults.baseURL}/auth/nexusmc/login`,
+  bindUrl: () => `${api.defaults.baseURL}/auth/nexusmc/bind`,
+
+  getBinding: () => api.get<ApiResponse<NexusMCBinding | null>>('/auth/nexusmc/binding'),
+
+  unbind: () => api.post<ApiResponse<null>>('/auth/nexusmc/unbind'),
+
+  // 双凭据代理：读取 NexusMC 侧当前用户身份
+  me: () => api.get('/auth/nexusmc/me'),
+
+  resources: (params: NexusMCResourceQuery = {}) =>
+    api.get('/nexusmc/resources', { params }),
+
+  resourceCategories: (platform?: string) =>
+    api.get('/nexusmc/resources/categories', { params: platform ? { platform } : {} }),
+
+  resourceFilters: (platform?: string) =>
+    api.get('/nexusmc/resources/filters', { params: platform ? { platform } : {} }),
+
+  resourceDetail: (idOrSlug: string) => api.get(`/nexusmc/resources/${idOrSlug}`),
+}
