@@ -25,7 +25,7 @@ onMounted(() => {
       const user = JSON.parse(rawUser) as NexusmcUser
       if (!user.sub && !user.username) throw new Error('invalid user payload')
       setNexusmcUser(user)
-      void router.replace('/nexusmc')
+      void router.replace('/')
       return
     } catch {
       error.value = '登录数据解析失败，请重新登录。'
@@ -45,8 +45,8 @@ onMounted(() => {
         <template v-if="error">
           <p class="font-semibold text-destructive">登录未完成</p>
           <p class="text-sm text-muted-foreground">{{ error }}</p>
-          <Button size="sm" class="btn-press focus-ring" @click="router.replace('/nexusmc')">
-            返回 NexusMC 资源页
+          <Button size="sm" class="btn-press focus-ring" @click="router.replace('/')">
+            返回资源首页
           </Button>
         </template>
         <template v-else>

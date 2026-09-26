@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { useNexusmcStore, NEXUSMC_REGISTER_URL } from '@/stores/nexusmc'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -11,28 +11,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import {
-  Menu,
-  X,
-  Home,
-  Upload,
-  User,
-  LogOut,
-  LayoutDashboard,
-  UserPlus,
-  Boxes,
-} from 'lucide-vue-next'
+import { Menu, X, Home, LogOut, UserPlus, ExternalLink, Sparkles } from 'lucide-vue-next'
 import { ref } from 'vue'
-import { getAvatarUrl } from '@/utils/image'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
-const authStore = useAuthStore()
+const store = useNexusmcStore()
 const route = useRoute()
 const isMenuOpen = ref(false)
 
 function handleLogout() {
-  authStore.logout()
-  window.location.href = '/'
+  store.logout()
+  isMenuOpen.value = false
 }
 
 function closeMenu() {
@@ -42,26 +31,6 @@ function closeMenu() {
 function isActive(path: string) {
   return route.path === path
 }
-
-interface NavLink {
-  to: string
-  label: string
-  icon: typeof Home
-  admin?: boolean
-}
-
-const publicLinks: NavLink[] = [
-  { to: '/', label: '首页', icon: Home },
-  { to: '/nexusmc', label: 'NexusMC 模型', icon: Boxes },
-]
-
-const authLinks: NavLink[] = [
-  { to: '/upload', label: '上传模型', icon: Upload },
-  { to: '/profile', label: '个人中心', icon: User },
-  { to: '/admin', label: '管理后台', icon: LayoutDashboard, admin: true },
-]
-
-const mobileLinks = publicLinks.concat(authLinks)
 </script>
 
 <template>
@@ -75,70 +44,58 @@ const mobileLinks = publicLinks.concat(authLinks)
         <!-- Desktop nav -->
         <div class="hidden md:flex md:items-center md:gap-1">
           <RouterLink
-            v-for="link in publicLinks"
-            :key="link.to"
-            :to="link.to"
+            to="/"
             class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-ring"
             :class="
-              isActive(link.to)
+              isActive('/')
                 ? 'bg-accent text-primary'
                 : 'text-muted-foreground hover:bg-accent hover:text-foreground'
             "
           >
-            <component :is="link.icon" class="h-4 w-4" />
-            {{ link.label }}
+            <Home class="h-4 w-4" />
+            资源广场
           </RouterLink>
 
-          <RouterLink
-            v-if="authStore.isAuthenticated"
-            to="/upload"
-            class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-ring"
-            :class="
-              isActive('/upload')
-                ? 'bg-accent text-primary'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-            "
-          >
-            <Upload class="h-4 w-4" />
-            上传模型
-          </RouterLink>
-
-          <template v-if="authStore.isAuthenticated">
+          <!-- NexusMC 登录 / 用户信息 -->
+          <template v-if="store.isLoggedIn">
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  class="btn-press rounded-full focus-ring"
-                  aria-label="用户菜单"
+                  class="btn-press gap-2 rounded-full pl-1 pr-3 focus-ring"
+                  aria-label="NexusMC 用户菜单"
                 >
-                  <Avatar class="h-8 w-8">
+                  <Avatar class="h-8 w-8 border">
                     <AvatarImage
-                      v-if="getAvatarUrl(authStore.user?.avatar_id, authStore.user?.avatar_url)"
-                      :src="getAvatarUrl(authStore.user?.avatar_id, authStore.user?.avatar_url) || undefined"
-                      :alt="authStore.user?.username || '用户头像'"
+                      v-if="store.user?.avatar"
+                      :src="store.user.avatar"
+                      :alt="store.user?.username || 'NexusMC 用户'"
                     />
-                    <span v-else class="flex h-full w-full items-center justify-center rounded-full bg-muted">
-                      <User class="h-4 w-4" />
+                    <span v-else class="flex h-full w-full items-center justify-center rounded-full bg-muted text-sm font-medium">
+                      {{ store.user?.username?.slice(0, 1).toUpperCase() || 'N' }}
                     </span>
                   </Avatar>
+                  <span class="max-w-32 truncate text-sm font-medium">{{ store.user?.username }}</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" class="w-48">
+              <DropdownMenuContent align="end" class="w-52">
                 <DropdownMenuLabel>
-                  {{ authStore.user?.username || '我的账号' }}
+                  <div class="flex flex-col">
+                    <span>{{ store.user?.username }}</span>
+                    <span class="text-xs font-normal text-muted-foreground">NexusMC 账号</span>
+                  </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem @click="$router.push('/profile')">
-                  <User class="mr-2 h-4 w-4" />
-                  个人中心
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  v-if="authStore.isAdmin"
-                  @click="$router.push('/admin')"
-                >
-                  <LayoutDashboard class="mr-2 h-4 w-4" />
-                  管理后台
+                <DropdownMenuItem as-child>
+                  <a
+                    :href="NEXUSMC_REGISTER_URL.replace('/register', '')"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="w-full cursor-pointer"
+                  >
+                    <ExternalLink class="mr-2 h-4 w-4" />
+                    打开 NexusMC
+                  </a>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -153,17 +110,16 @@ const mobileLinks = publicLinks.concat(authLinks)
           </template>
 
           <template v-else>
-            <RouterLink to="/login">
+            <a :href="NEXUSMC_REGISTER_URL" target="_blank" rel="noopener noreferrer">
               <Button variant="outline" size="sm" class="btn-press focus-ring">
-                登录
-              </Button>
-            </RouterLink>
-            <RouterLink to="/login?mode=register">
-              <Button size="sm" class="btn-press focus-ring">
                 <UserPlus class="mr-1.5 h-4 w-4" />
                 注册
               </Button>
-            </RouterLink>
+            </a>
+            <Button size="sm" class="btn-press focus-ring" @click="store.login()">
+              <Sparkles class="mr-1.5 h-4 w-4" />
+              NexusMC 登录
+            </Button>
           </template>
 
           <ThemeToggle />
@@ -223,54 +179,73 @@ const mobileLinks = publicLinks.concat(authLinks)
 
           <div class="flex-1 overflow-y-auto p-4 space-y-1">
             <RouterLink
-              v-for="link in mobileLinks"
-              :key="link.to"
-              v-show="
-                !['/profile', '/admin', '/upload'].includes(link.to) ||
-                (authStore.isAuthenticated && (!link.admin || authStore.isAdmin))
-              "
-              :to="link.to"
+              to="/"
               class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors focus-ring"
-              :class="
-                isActive(link.to)
-                  ? 'bg-accent text-primary'
-                  : 'text-foreground hover:bg-accent'
-              "
+              :class="isActive('/') ? 'bg-accent text-primary' : 'text-foreground hover:bg-accent'"
               @click="closeMenu"
             >
-              <component :is="link.icon" class="h-5 w-5" />
-              {{ link.label }}
+              <Home class="h-5 w-5" />
+              资源广场
             </RouterLink>
 
-            <template v-if="!authStore.isAuthenticated">
+            <!-- 用户信息 -->
+            <div v-if="store.isLoggedIn" class="mt-4 space-y-1 border-t pt-4">
+              <div class="flex items-center gap-3 rounded-lg px-3 py-3">
+                <Avatar class="h-9 w-9 border">
+                  <AvatarImage
+                    v-if="store.user?.avatar"
+                    :src="store.user.avatar"
+                    :alt="store.user?.username || 'NexusMC 用户'"
+                  />
+                  <span v-else class="flex h-full w-full items-center justify-center rounded-full bg-muted text-sm font-medium">
+                    {{ store.user?.username?.slice(0, 1).toUpperCase() || 'N' }}
+                  </span>
+                </Avatar>
+                <div class="min-w-0">
+                  <div class="truncate text-sm font-medium">{{ store.user?.username }}</div>
+                  <div class="text-xs text-muted-foreground">NexusMC 账号</div>
+                </div>
+              </div>
+              <a
+                :href="NEXUSMC_REGISTER_URL.replace('/register', '')"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors hover:bg-accent focus-ring"
+                @click="closeMenu"
+              >
+                <ExternalLink class="h-5 w-5" />
+                打开 NexusMC
+              </a>
+              <button
+                class="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-base font-medium text-destructive transition-colors hover:bg-destructive/10 focus-ring"
+                @click="handleLogout"
+              >
+                <LogOut class="h-5 w-5" />
+                退出登录
+              </button>
+            </div>
+
+            <template v-else>
               <div class="mt-4 space-y-1 border-t pt-4">
-                <RouterLink
-                  to="/login"
-                  class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-primary transition-colors hover:bg-primary/10 focus-ring"
-                  @click="closeMenu"
-                >
-                  <User class="h-5 w-5" />
-                  登录
-                </RouterLink>
-                <RouterLink
-                  to="/login?mode=register"
+                <a
+                  :href="NEXUSMC_REGISTER_URL"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-primary transition-colors hover:bg-primary/10 focus-ring"
                   @click="closeMenu"
                 >
                   <UserPlus class="h-5 w-5" />
-                  注册
-                </RouterLink>
+                  注册 NexusMC 账号
+                </a>
+                <button
+                  class="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-base font-medium text-primary transition-colors hover:bg-primary/10 focus-ring"
+                  @click="store.login(); closeMenu()"
+                >
+                  <Sparkles class="h-5 w-5" />
+                  NexusMC 登录
+                </button>
               </div>
             </template>
-
-            <button
-              v-else
-              class="mt-4 flex w-full items-center gap-3 rounded-lg border-t px-3 py-3 text-left text-base font-medium text-destructive transition-colors hover:bg-destructive/10 focus-ring"
-              @click="handleLogout(); closeMenu()"
-            >
-              <LogOut class="h-5 w-5" />
-              退出登录
-            </button>
           </div>
 
           <div class="border-t p-4 safe-area-inset">

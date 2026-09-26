@@ -17,15 +17,8 @@ function copyIndexToRoutes() {
       const indexContent = fs.readFileSync(indexPath, 'utf-8')
       
       const routes = [
-        'login',
-        'reset-password',
-        'update-password',
-        'verify-email',
-        'verify-email-change',
-        'upload',
-        'profile',
-        'admin',
-        'admin/users',
+        'nexusmc/callback',
+        'nexusmc/resource',
       ]
       
       routes.forEach(route => {
@@ -52,7 +45,7 @@ export default defineConfig({
       manifest: {
         name: 'YSM 模型站',
         short_name: 'YSMMC',
-        description: 'YSM 模型站 - 模型分享平台',
+        description: 'YSM 模型站 - NexusMC 模型资源精选，一键前往下载',
         theme_color: '#3b82f6',
         background_color: '#ffffff',
         display: 'standalone',
@@ -139,14 +132,6 @@ export default defineConfig({
       // NEXUSMC_DEV_TARGET 指向其地址（默认本地 8787 端口）。
       '/api/nexusmc': {
         target: process.env.NEXUSMC_DEV_TARGET || 'http://127.0.0.1:8787',
-        changeOrigin: true,
-      },
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/uploads': {
-        target: 'http://localhost:8080',
         changeOrigin: true,
       },
     },
