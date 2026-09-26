@@ -91,6 +91,16 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
+    path: '/nexusmc',
+    name: 'nexusmc-models',
+    component: () => import('@/views/NexusmcModelsView.vue'),
+  },
+  {
+    path: '/nexusmc/callback',
+    name: 'nexusmc-callback',
+    component: () => import('@/views/NexusmcCallbackView.vue'),
+  },
+  {
     path: '/user/:id',
     name: 'user-profile',
     component: () => import('@/views/UserPublicProfileView.vue'),

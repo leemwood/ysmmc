@@ -135,6 +135,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // NexusMC 云函数本地调试：先启动 `edgeone makers dev`，再用
+      // NEXUSMC_DEV_TARGET 指向其地址（默认本地 8787 端口）。
+      '/api/nexusmc': {
+        target: process.env.NEXUSMC_DEV_TARGET || 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
