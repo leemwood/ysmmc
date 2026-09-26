@@ -21,7 +21,8 @@ import (
 
 const (
 	DefaultSiteOrigin = "https://www.nexusmc.cn"
-	defaultScopes     = "user:basic user:email"
+	// 留空 = 授权请求不带 scope，由 NexusMC 按应用登记的默认权限发放
+	defaultScopes = ""
 )
 
 // ErrNotConfigured means the EdgeOne environment variables for NexusMC are missing.
@@ -278,12 +279,16 @@ func FrontendOrigin(host string, isTLS bool, protoHeader, forwardedHost string) 
 }
 
 // AuthorizeURL builds the NexusMC /authorize address (docs: site-oauth2-provider).
+// Scope is omitted when not configured: the server then grants the app's
+// registered default scopes, which avoids invalid_scope mismatches.
 func AuthorizeURL(redirectURI, state string) string {
 	q := url.Values{}
 	q.Set("response_type", "code")
 	q.Set("client_id", OAuthClientID())
 	q.Set("redirect_uri", redirectURI)
-	q.Set("scope", Scopes())
+	if s := Scopes(); s != "" {
+		q.Set("scope", s)
+	}
 	q.Set("state", state)
 	return SiteOrigin() + "/api/oauth2/authorize?" + q.Encode()
 }
