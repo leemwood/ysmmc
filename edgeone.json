@@ -1,7 +1,6 @@
 {
   "buildCommand": "pnpm --dir frontend install --frozen-lockfile && pnpm --dir frontend run build",
   "outputDirectory": "frontend/dist",
-  "nodeVersion": "22.11.0",
   "rewrites": [
     {
       "source": "/*",
