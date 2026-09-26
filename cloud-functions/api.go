@@ -132,8 +132,13 @@ func authStart(c *gin.Context) {
 func authCallback(c *gin.Context) {
 	https := isHTTPS(c)
 	frontend := nexusmc.FrontendOrigin(c.Request.Host, c.Request.TLS != nil, c.GetHeader("X-Forwarded-Proto"), c.GetHeader("X-Forwarded-Host"))
-	fail := func(code string) {
-		http.Redirect(c.Writer, c.Request, frontend+"/nexusmc/callback?error="+url.QueryEscape(code), http.StatusFound)
+	fail := func(code string, detail ...string) {
+		u := frontend + "/nexusmc/callback?error=" + url.QueryEscape(code)
+		if len(detail) > 0 && detail[0] != "" {
+			// 诊断期临时透出上游错误，便于定位 invalid_client 等具体原因
+			u += "&detail=" + url.QueryEscape(detail[0])
+		}
+		http.Redirect(c.Writer, c.Request, u, http.StatusFound)
 	}
 
 	if e := c.Query("error"); e != "" {
@@ -163,7 +168,7 @@ func authCallback(c *gin.Context) {
 	accessToken, err := nexusmc.ExchangeCode(code, redirectURI)
 	if err != nil {
 		log.Printf("[nexusmc] token exchange failed: %v", err)
-		fail("token_exchange")
+		fail("token_exchange", err.Error())
 		return
 	}
 
