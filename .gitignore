@@ -69,3 +69,9 @@ docker-compose.override.yml
 # Release
 *.tar.gz
 release/
+
+# Tencent Cloud EdgeOne
+.env
+.edgeone/*
+.tef_dist/*
+  
