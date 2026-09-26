@@ -15,6 +15,7 @@ const errorMessages: Record<string, string> = {
   missing_code: '未收到 NexusMC 的授权码，请重新登录。',
   token_exchange: '换取 NexusMC 令牌失败，请稍后重试。',
   userinfo: '获取 NexusMC 用户信息失败，请稍后重试。',
+  unauthorized_client: 'NexusMC 侧的 OAuth 应用尚未通过审核或已停用，请联系 NexusMC 管理员确认后重试。',
   invalid_redirect_uri: '回调地址与 NexusMC 登记的不一致，请联系站点管理员。',
 }
 
