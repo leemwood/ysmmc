@@ -131,7 +131,7 @@ func authStart(c *gin.Context) {
 
 func authCallback(c *gin.Context) {
 	https := isHTTPS(c)
-	frontend := nexusmc.FrontendOrigin(c.Request.Host, c.Request.TLS != nil, c.GetHeader("X-Forwarded-Proto"))
+	frontend := nexusmc.FrontendOrigin(c.Request.Host, c.Request.TLS != nil, c.GetHeader("X-Forwarded-Proto"), c.GetHeader("X-Forwarded-Host"))
 	fail := func(code string) {
 		http.Redirect(c.Writer, c.Request, frontend+"/nexusmc/callback?error="+url.QueryEscape(code), http.StatusFound)
 	}

@@ -265,9 +265,14 @@ func RedirectURI(host string, isTLS bool, protoHeader, forwardedHost string) str
 }
 
 // FrontendOrigin is where the OAuth callback redirects the browser afterwards.
-func FrontendOrigin(host string, isTLS bool, protoHeader string) string {
+// Same precedence rules as RedirectURI: env var first, then the forwarded
+// host, because the function's own Host is the platform-internal one.
+func FrontendOrigin(host string, isTLS bool, protoHeader, forwardedHost string) string {
 	if v := FrontendOriginEnv(); v != "" {
 		return v
+	}
+	if forwardedHost != "" {
+		return requestScheme(isTLS, protoHeader) + "://" + forwardedHost
 	}
 	return requestScheme(isTLS, protoHeader) + "://" + host
 }
