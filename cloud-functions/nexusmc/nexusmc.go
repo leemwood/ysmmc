@@ -251,10 +251,15 @@ func requestScheme(isTLS bool, protoHeader string) string {
 
 // RedirectURI returns the OAuth2 callback address. NEXUSMC_OAUTH_REDIRECT_URI
 // should be set in production so it matches the value registered on NexusMC
-// verbatim; otherwise it is derived from the incoming request.
-func RedirectURI(host string, isTLS bool, protoHeader string) string {
+// verbatim. Without it the callback is derived from the forwarded request
+// headers; EdgeOne's proxy hides the real host, so X-Forwarded-Host takes
+// precedence over the internal Host the function actually sees.
+func RedirectURI(host string, isTLS bool, protoHeader, forwardedHost string) string {
 	if v := os.Getenv("NEXUSMC_OAUTH_REDIRECT_URI"); v != "" {
 		return v
+	}
+	if forwardedHost != "" {
+		return requestScheme(isTLS, protoHeader) + "://" + forwardedHost + "/api/nexusmc/auth/callback"
 	}
 	return requestScheme(isTLS, protoHeader) + "://" + host + "/api/nexusmc/auth/callback"
 }

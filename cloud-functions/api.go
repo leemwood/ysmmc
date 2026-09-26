@@ -125,7 +125,7 @@ func authStart(c *gin.Context) {
 	secure := isHTTPS(c)
 	// The cookie is scoped to the function routes so only they can read it.
 	c.SetCookie("nexusmc_oauth_state", state, 600, "/api/nexusmc", "", secure, true)
-	redirectURI := nexusmc.RedirectURI(c.Request.Host, c.Request.TLS != nil, c.GetHeader("X-Forwarded-Proto"))
+	redirectURI := nexusmc.RedirectURI(c.Request.Host, c.Request.TLS != nil, c.GetHeader("X-Forwarded-Proto"), c.GetHeader("X-Forwarded-Host"))
 	http.Redirect(c.Writer, c.Request, nexusmc.AuthorizeURL(redirectURI, state), http.StatusFound)
 }
 
@@ -159,7 +159,7 @@ func authCallback(c *gin.Context) {
 		return
 	}
 
-	redirectURI := nexusmc.RedirectURI(c.Request.Host, c.Request.TLS != nil, c.GetHeader("X-Forwarded-Proto"))
+	redirectURI := nexusmc.RedirectURI(c.Request.Host, c.Request.TLS != nil, c.GetHeader("X-Forwarded-Proto"), c.GetHeader("X-Forwarded-Host"))
 	accessToken, err := nexusmc.ExchangeCode(code, redirectURI)
 	if err != nil {
 		log.Printf("[nexusmc] token exchange failed: %v", err)
