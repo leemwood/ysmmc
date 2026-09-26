@@ -144,6 +144,9 @@ function isActive(path: string) {
     </div>
 
     <!-- Mobile drawer -->
+    <!-- Mobile drawer：Teleport 到 body，避免 nav 的 backdrop-filter 把
+         fixed 定位变成相对导航栏，导致抽屉被压进 64px 的导航条里 -->
+    <Teleport to="body">
     <Transition
       enter-active-class="transition ease-out duration-300"
       enter-from-class="translate-x-full"
@@ -257,5 +260,6 @@ function isActive(path: string) {
         </div>
       </div>
     </Transition>
+    </Teleport>
   </nav>
 </template>

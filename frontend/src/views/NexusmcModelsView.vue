@@ -175,7 +175,7 @@ onMounted(() => {
             NexusMC 资源精选站
           </p>
           <h1 class="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
-            欢迎回来，{{ displayName }}
+            {{ store.isLoggedIn ? `欢迎回来，${displayName}` : 'YSM 模型资源精选' }}
           </h1>
           <p class="mt-2 text-sm text-muted-foreground sm:text-base">
             这里汇集了 NexusMC 社区的公开模型资源。浏览、挑选，一键前往 NexusMC 完成下载——
