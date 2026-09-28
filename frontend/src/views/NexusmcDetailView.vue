@@ -136,7 +136,7 @@ onMounted(fetchDetail)
               v-if="resourceCover(item)"
               :src="resourceCover(item)"
               :alt="resourceTitle(item)"
-              class="h-full w-full object-contain"
+              style="height: 100%; width: 100%; object-fit: contain"
             />
             <div v-else class="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
               <ImageOff class="h-12 w-12 opacity-50" />
