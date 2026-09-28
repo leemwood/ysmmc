@@ -28,6 +28,7 @@ import {
   type NexusmcResource,
 } from '@/lib/nexusmc'
 import { NEXUSMC_SITE, useNexusmcStore } from '@/stores/nexusmc'
+import { tiptapToHtml } from '@/utils/tiptap'
 
 const route = useRoute()
 const store = useNexusmcStore()
@@ -47,6 +48,12 @@ const updatedAt = computed(() => {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('zh-CN')
 })
 const displayName = computed(() => store.user?.username || '')
+// TipTap 正文 → 受限 HTML；无正文时回退为简介
+const contentHtml = computed(() => {
+  if (!item.value) return ''
+  const raw = (item.value as Record<string, unknown>).content ?? (item.value as Record<string, unknown>).body
+  return tiptapToHtml(raw)
+})
 
 async function fetchDetail() {
   loading.value = true
@@ -204,12 +211,59 @@ onMounted(fetchDetail)
         </div>
       </div>
 
-      <!-- 详情正文（上游返回结构化正文时展示） -->
-      <Card v-if="(item as Record<string, unknown>).content || (item as Record<string, unknown>).body" class="mt-8">
-        <CardContent class="prose-sm whitespace-pre-line p-6 leading-relaxed text-foreground/90">
-          {{ (item as Record<string, unknown>).content || (item as Record<string, unknown>).body }}
-        </CardContent>
+      <!-- 详情正文（TipTap JSON 渲染为受限 HTML；纯文本原样展示） -->
+      <Card v-if="contentHtml" class="mt-8">
+        <CardContent class="nexusmc-article p-6" v-html="contentHtml" />
       </Card>
     </div>
   </div>
 </template>
+
+<style scoped>
+.nexusmc-article :deep(p) {
+  margin: 0.75rem 0;
+  line-height: 1.8;
+}
+.nexusmc-article :deep(h2),
+.nexusmc-article :deep(h3),
+.nexusmc-article :deep(h4) {
+  margin: 1.25rem 0 0.5rem;
+  font-weight: 600;
+}
+.nexusmc-article :deep(ul),
+.nexusmc-article :deep(ol) {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+  list-style: revert;
+}
+.nexusmc-article :deep(li) {
+  margin: 0.25rem 0;
+  line-height: 1.7;
+}
+.nexusmc-article :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 0.75rem 0;
+}
+.nexusmc-article :deep(blockquote) {
+  border-left: 3px solid var(--border);
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+  color: var(--muted-foreground);
+}
+.nexusmc-article :deep(pre) {
+  background: var(--muted);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+}
+.nexusmc-article :deep(code) {
+  font-size: 0.875em;
+}
+.nexusmc-article :deep(hr) {
+  border-color: var(--border);
+  margin: 1rem 0;
+}
+</style>

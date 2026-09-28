@@ -126,7 +126,7 @@ export function resourceDescription(item: NexusmcResource): string {
 }
 
 export function resourceCover(item: NexusmcResource): string {
-  return pickString(item, ['cover', 'cover_image_url', 'image_url', 'thumbnail'])
+  return pickString(item, ['cover', 'cover_image_url', 'coverImage', 'image_url', 'thumbnail']);
 }
 
 export function resourcePageUrl(item: NexusmcResource): string {
