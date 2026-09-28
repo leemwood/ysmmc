@@ -314,7 +314,7 @@ onMounted(() => {
               :alt="resourceTitle(item)"
               loading="lazy"
               decoding="async"
-              class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              class="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
             />
             <div v-else class="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
               <ImageOff class="h-10 w-10 opacity-50" />
