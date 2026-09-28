@@ -31,7 +31,7 @@ function renderInline(nodes: Node[] | undefined): string {
   let out = '';
   for (const n of nodes) {
     if (n.type === 'text' && typeof n.text === 'string') {
-      let piece = esc(n.text);
+      let piece = linkify(esc(n.text));
       for (const m of n.marks || []) {
         if (m.type === 'bold') piece = `<strong>${piece}</strong>`;
         else if (m.type === 'italic') piece = `<em>${piece}</em>`;
@@ -50,6 +50,14 @@ function renderInline(nodes: Node[] | undefined): string {
     }
   }
   return out;
+}
+
+// 正文里的裸 URL 自动转可点击链接（含整段只有链接的情况）
+function linkify(escaped: string): string {
+  return escaped.replace(/(https?:\/\/[^\s<]+)/g, (url) => {
+    const href = url.replace(/&amp;/g, '&');
+    return `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+  });
 }
 
 function renderBlock(node: Node): string {

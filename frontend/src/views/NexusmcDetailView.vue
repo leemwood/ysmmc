@@ -262,6 +262,15 @@ onMounted(fetchDetail)
 .nexusmc-article :deep(code) {
   font-size: 0.875em;
 }
+.nexusmc-article :deep(a) {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+.nexusmc-article :deep(a:hover) {
+  opacity: 0.85;
+}
 .nexusmc-article :deep(hr) {
   border-color: var(--border);
   margin: 1rem 0;
