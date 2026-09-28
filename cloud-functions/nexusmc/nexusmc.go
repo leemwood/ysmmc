@@ -44,6 +44,7 @@ func OAuthClientSecret() string  { return os.Getenv("NEXUSMC_OAUTH_CLIENT_SECRET
 func Scopes() string             { return env("NEXUSMC_OAUTH_SCOPES", defaultScopes) }
 func ResourcePlatform() string   { return os.Getenv("NEXUSMC_RESOURCE_PLATFORM") }
 func ResourceCategory() string   { return os.Getenv("NEXUSMC_RESOURCE_CATEGORY") }
+func ResourceSubCategory() string { return os.Getenv("NEXUSMC_RESOURCE_SUB_CATEGORY") }
 func FrontendOriginEnv() string  { return strings.TrimRight(os.Getenv("NEXUSMC_FRONTEND_ORIGIN"), "/") }
 
 func SiteConfigured() bool  { return APIKey() != "" }
@@ -146,6 +147,9 @@ func withDefaults(query url.Values) url.Values {
 	}
 	if q.Get("category") == "" {
 		q.Set("category", ResourceCategory())
+	}
+	if q.Get("subCategory") == "" {
+		q.Set("subCategory", ResourceSubCategory())
 	}
 	return q
 }
