@@ -352,8 +352,12 @@ onMounted(() => {
       </Card>
     </div>
 
-    <div v-else-if="!notConfigured && !error" class="mt-16 text-center text-muted-foreground">
-      没有找到匹配的资源。
+    <div v-else-if="!notConfigured && !error" class="mt-16 text-center">
+      <p class="text-muted-foreground">暂无 YSM 模型资源。</p>
+      <p class="mt-2 text-sm text-muted-foreground/70">
+        新模型在 NexusMC 审核通过后会自动出现在这里，
+        <a :href="NEXUSMC_SITE + '/resources/new'" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">欢迎前往 NexusMC 投稿 →</a>
+      </p>
     </div>
 
     <!-- Pagination -->
