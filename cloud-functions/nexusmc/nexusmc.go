@@ -213,6 +213,9 @@ func decoratePageURLs(body []byte) []byte {
 	if res, ok := doc["resource"].(map[string]any); ok {
 		decorate(res)
 	}
+	if item, ok := doc["item"].(map[string]any); ok {
+		decorate(item)
+	}
 	if _, ok := doc["page_url"]; !ok {
 		if _, hasID := doc["id"]; hasID {
 			decorate(doc)
