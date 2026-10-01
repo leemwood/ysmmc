@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useNexusmcStore } from '@/stores/nexusmc'
 import { NEXUSMC_REGISTER_URL, NEXUSMC_SITE } from '@/lib/nexusmc'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import NexusmcAvatar from '@/components/NexusmcAvatar.vue'
 import {
   DropdownMenu,
@@ -12,13 +13,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { Menu, X, Home, LogOut, UserPlus, ExternalLink, Sparkles, UserRound } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { Menu, X, Home, LogOut, UserPlus, ExternalLink, Sparkles, UserRound, Search } from 'lucide-vue-next'
+import { ref, watch } from 'vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const store = useNexusmcStore()
 const route = useRoute()
+const router = useRouter()
 const isMenuOpen = ref(false)
+// 顶栏搜索框与首页路由 ?q= 双向同步
+const searchInput = ref(String(route.query.q || ''))
+
+watch(() => route.query.q, (q) => {
+  searchInput.value = String(q || '')
+})
+
+function submitSearch() {
+  const q = searchInput.value.trim()
+  // 任何页面搜索都回首页并带上关键词；首页的列表通过路由 watch 响应
+  void router.push(q ? { path: '/', query: { q } } : { path: '/' })
+  isMenuOpen.value = false
+}
 
 function handleLogout() {
   store.logout()
@@ -56,6 +71,18 @@ function isActive(path: string) {
             <Home class="h-4 w-4" />
             资源广场
           </RouterLink>
+
+          <!-- 顶栏搜索（桌面端） -->
+          <form class="relative hidden md:block" @submit.prevent="submitSearch">
+            <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              v-model="searchInput"
+              placeholder="搜索 NexusMC 资源…"
+              class="h-9 w-44 pl-9 lg:w-56"
+              maxlength="100"
+              aria-label="搜索 NexusMC 资源"
+            />
+          </form>
 
           <!-- NexusMC 登录 / 用户信息 -->
           <template v-if="store.isLoggedIn">
@@ -179,6 +206,21 @@ function isActive(path: string) {
           </div>
 
           <div class="flex-1 overflow-y-auto p-4 space-y-1">
+            <!-- 移动抽屉内的搜索 -->
+            <form class="mb-3 flex gap-2" @submit.prevent="submitSearch">
+              <div class="relative flex-1">
+                <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  v-model="searchInput"
+                  placeholder="搜索 NexusMC 资源…"
+                  class="pl-9"
+                  maxlength="100"
+                  aria-label="搜索 NexusMC 资源"
+                />
+              </div>
+              <Button type="submit" variant="secondary" size="sm" class="btn-press focus-ring shrink-0">搜索</Button>
+            </form>
+
             <RouterLink
               to="/"
               class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors focus-ring"

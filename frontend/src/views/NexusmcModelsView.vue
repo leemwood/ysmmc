@@ -1,23 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
-import NexusmcAvatar from '@/components/NexusmcAvatar.vue'
 import ResourceCover from '@/components/ResourceCover.vue'
 import {
   Download,
   Eye,
-  LogOut,
   RefreshCw,
-  Search,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
 } from 'lucide-vue-next'
 import {
   isNexusmcConfigError,
@@ -36,11 +31,11 @@ import {
   type NexusmcListResponse,
   type NexusmcResource,
 } from '@/lib/nexusmc'
-import { useNexusmcStore } from '@/stores/nexusmc'
 
 const PAGE_SIZE = 20
 
-const store = useNexusmcStore()
+const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const error = ref('')
 const notConfigured = ref(false)
@@ -48,12 +43,21 @@ const items = ref<NexusmcResource[]>([])
 const total = ref(0)
 const totalPages = ref(1)
 const page = ref(1)
-const keyword = ref('')
-const searchInput = ref('')
+// 搜索关键词与顶栏搜索框通过路由 ?q= 双向同步
+const keyword = ref(String(route.query.q || '').trim())
 const categories = ref<CatalogOption[]>([])
 const activeCategory = ref('')
 
 const totalPagesSafe = computed(() => Math.max(totalPages.value, 1))
+
+// 顶栏提交搜索 / 清除搜索后路由变化，这里跟随重新加载
+watch(() => route.query.q, (q) => {
+  const next = String(q || '').trim()
+  if (next === keyword.value) return
+  keyword.value = next
+  page.value = 1
+  fetchResources()
+})
 
 async function fetchCatalog() {
   try {
@@ -97,16 +101,11 @@ async function fetchResources() {
   }
 }
 
-function submitSearch() {
-  keyword.value = searchInput.value.trim()
-  page.value = 1
-  fetchResources()
-}
-
 function clearSearch() {
-  searchInput.value = ''
   keyword.value = ''
   page.value = 1
+  // 同步清掉路由上的 q（watcher 会因值相同而跳过，不会重复请求）
+  if (route.query.q !== undefined) void router.replace({ query: {} })
   fetchResources()
 }
 
@@ -131,41 +130,8 @@ onMounted(() => {
 
 <template>
   <div class="container-app py-6 sm:py-8">
-    <!-- Hero：站点定位与引流 -->
-    <section class="rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-background p-6 sm:p-10">
-      <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div class="max-w-2xl">
-          <p class="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-            <Sparkles class="h-3.5 w-3.5" />
-            NexusMC 资源精选站
-          </p>
-          <h1 class="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
-            {{ store.isLoggedIn ? `欢迎回来，${store.displayName}` : 'YSM 模型资源精选' }}
-          </h1>
-          <p class="mt-2 text-sm text-muted-foreground sm:text-base">
-            这里汇集了 NexusMC 社区的公开模型资源。浏览、挑选，一键前往 NexusMC 完成下载——
-            登录、收藏与互动都在 NexusMC 进行。
-          </p>
-        </div>
-
-        <!-- 用户信息卡片 -->
-        <div v-if="store.user" class="flex items-center gap-4 rounded-xl border bg-background/80 p-4 lg:w-80">
-          <NexusmcAvatar size="lg" class="border" />
-          <div class="min-w-0 flex-1">
-            <div class="truncate font-semibold">{{ store.displayName }}</div>
-            <div class="truncate text-xs text-muted-foreground">
-              {{ store.user.email || `NexusMC UID ${store.user.uid ?? '—'}` }}
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" class="btn-press focus-ring shrink-0" aria-label="退出 NexusMC 登录" @click="store.logout()">
-            <LogOut class="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    </section>
-
     <!-- Not configured banner -->
-    <Alert v-if="notConfigured" class="mt-6">
+    <Alert v-if="notConfigured">
       <AlertDescription>
         <span class="font-medium">NexusMC 凭据尚未配置。</span>
         部署环境缺少 NEXUSMC_SITE_API_KEY 等 EdgeOne 环境变量，资源展示与登录暂不可用。
@@ -173,39 +139,22 @@ onMounted(() => {
       </AlertDescription>
     </Alert>
 
-    <Alert v-else-if="error" class="mt-6" variant="destructive">
+    <Alert v-else-if="error" variant="destructive">
       <AlertDescription>
         <span class="font-medium">加载失败。</span>
         {{ error }}
       </AlertDescription>
     </Alert>
 
-    <!-- Toolbar -->
-    <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-      <form class="flex flex-1 gap-2" @submit.prevent="submitSearch">
-        <div class="relative flex-1 max-w-md">
-          <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            v-model="searchInput"
-            placeholder="搜索 NexusMC 资源…"
-            class="pl-9"
-            maxlength="100"
-          />
-        </div>
-        <Button type="submit" variant="secondary" size="sm" class="btn-press focus-ring">搜索</Button>
-        <Button
-          v-if="keyword"
-          type="button"
-          variant="ghost"
-          size="sm"
-          class="btn-press focus-ring"
-          @click="clearSearch"
-        >
+    <!-- Toolbar：分类筛选 + 刷新；搜索在顶栏 -->
+    <div class="flex items-center justify-between gap-2" :class="notConfigured || error ? 'mt-6' : ''">
+      <div v-if="keyword" class="flex min-w-0 items-center gap-2 text-sm">
+        <span class="truncate text-muted-foreground">搜索「{{ keyword }}」的结果</span>
+        <Button variant="ghost" size="sm" class="btn-press focus-ring shrink-0" @click="clearSearch">
           清除
         </Button>
-      </form>
-
-      <div class="flex items-center gap-2">
+      </div>
+      <div class="flex items-center gap-2" :class="keyword ? '' : 'ml-auto'">
         <select
           v-if="categories.length"
           v-model="activeCategory"
