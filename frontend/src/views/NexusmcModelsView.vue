@@ -12,13 +12,11 @@ import ResourceCover from '@/components/ResourceCover.vue'
 import {
   Download,
   Eye,
-  ExternalLink,
   LogOut,
   RefreshCw,
   Search,
   ChevronLeft,
   ChevronRight,
-  UserPlus,
   Sparkles,
 } from 'lucide-vue-next'
 import {
@@ -148,25 +146,6 @@ onMounted(() => {
             这里汇集了 NexusMC 社区的公开模型资源。浏览、挑选，一键前往 NexusMC 完成下载——
             登录、收藏与互动都在 NexusMC 进行。
           </p>
-          <div class="mt-5 flex flex-wrap items-center gap-3">
-            <a :href="NEXUSMC_SITE" target="_blank" rel="noopener noreferrer">
-              <Button class="btn-press focus-ring">
-                <ExternalLink class="mr-1.5 h-4 w-4" />
-                前往 NexusMC
-              </Button>
-            </a>
-            <template v-if="!store.isLoggedIn">
-              <Button variant="outline" class="btn-press focus-ring" @click="store.login()">
-                通过 NexusMC 登录
-              </Button>
-              <a :href="NEXUSMC_REGISTER_URL" target="_blank" rel="noopener noreferrer">
-                <Button variant="ghost" class="btn-press focus-ring">
-                  <UserPlus class="mr-1.5 h-4 w-4" />
-                  注册 NexusMC
-                </Button>
-              </a>
-            </template>
-          </div>
         </div>
 
         <!-- 用户信息卡片 -->
