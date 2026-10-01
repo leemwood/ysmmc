@@ -70,6 +70,33 @@ export const nexusmcApi = {
     api.get<NexusmcListResponse>('/search', { params: { q, ...params } }),
 }
 
+// --- OAuth 用户数据（/me/*，需登录，token 由服务端 httpOnly cookie 持有） ----
+
+export interface NexusmcMeListResponse {
+  items?: Record<string, unknown>[]
+  pagination?: NexusmcPagination
+  [key: string]: unknown
+}
+
+export const nexusmcMeApi = {
+  content: (params: Record<string, string | number | undefined> = {}) =>
+    api.get<NexusmcMeListResponse>('/me/content', { params }),
+  favorites: (params: Record<string, string | number | undefined> = {}) =>
+    api.get<NexusmcMeListResponse>('/me/favorites', { params }),
+  likes: (params: Record<string, string | number | undefined> = {}) =>
+    api.get<NexusmcMeListResponse>('/me/likes', { params }),
+  notifications: (params: Record<string, string | number | undefined> = {}) =>
+    api.get<NexusmcMeListResponse>('/me/notifications', { params }),
+  unreadCount: () => api.get<{ unread?: number; [key: string]: unknown }>('/me/notifications/unread-count'),
+  markRead: (id: string | number) => api.post(`/me/notifications/${encodeURIComponent(String(id))}/read`),
+  markAllRead: () => api.post('/me/notifications/read-all'),
+}
+
+// 401：token 缺失/过期，或授权未包含所需 scope，需要重新登录
+export function isNexusmcAuthError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 401
+}
+
 const USER_KEY = 'nexusmc_user'
 
 export function getNexusmcUser(): NexusmcUser | null {
@@ -89,6 +116,8 @@ export function clearNexusmcUser(): void {
   localStorage.removeItem(USER_KEY)
 }
 
+export const NEXUSMC_SITE = 'https://www.nexusmc.cn'
+export const NEXUSMC_REGISTER_URL = `${NEXUSMC_SITE}/register`
 export const NEXUSMC_LOGIN_URL = '/api/nexusmc/auth/start'
 
 // 宽松取值工具：上游字段名存在多种可能。
@@ -126,7 +155,7 @@ export function resourceDescription(item: NexusmcResource): string {
 }
 
 export function resourceCover(item: NexusmcResource): string {
-  return pickString(item, ['cover', 'cover_image_url', 'coverImage', 'image_url', 'thumbnail']);
+  return pickString(item, ['cover', 'cover_image_url', 'coverImage', 'image_url', 'thumbnail'])
 }
 
 export function resourcePageUrl(item: NexusmcResource): string {
@@ -139,4 +168,49 @@ export function resourceDownloads(item: NexusmcResource): number | undefined {
 
 export function resourceViews(item: NexusmcResource): number | undefined {
   return pickNumber(item, ['views', 'view_count'])
+}
+
+export function resourceUpdatedAt(item: NexusmcResource): string {
+  return pickString(item, ['updated_at', 'updatedAt', 'updated_at_time'])
+}
+
+// 详情页路由地址：优先 slug，退回 id；缺失时返回空串由调用方兜底。
+export function resourceDetailPath(item: NexusmcResource): string {
+  const id = item.slug || item.id
+  return id ? `/nexusmc/resource/${encodeURIComponent(String(id))}` : ''
+}
+
+// --- 资源分类选项 -----------------------------------------------------------
+
+export interface CatalogOption {
+  value: string
+  label: string
+}
+
+// 上游 catalog 返回结构不稳定：递归收集字符串/键值对形式的选项并去重。
+export function normalizeCatalogOptions(data: unknown): CatalogOption[] {
+  const out: CatalogOption[] = []
+  const visit = (node: unknown) => {
+    if (Array.isArray(node)) {
+      for (const entry of node) {
+        if (typeof entry === 'string') {
+          out.push({ value: entry, label: entry })
+        } else if (entry && typeof entry === 'object') {
+          const obj = entry as Record<string, unknown>
+          const value = (obj.value || obj.slug || obj.id || obj.key) as string | undefined
+          const label = (obj.label || obj.name || obj.title || value) as string | undefined
+          if (value && label) out.push({ value: String(value), label: String(label) })
+        }
+      }
+      return
+    }
+    if (node && typeof node === 'object') {
+      for (const value of Object.values(node as Record<string, unknown>)) {
+        if (Array.isArray(value)) visit(value)
+      }
+    }
+  }
+  visit(data)
+  const seen = new Set<string>()
+  return out.filter((o) => (seen.has(o.value) ? false : (seen.add(o.value), true)))
 }

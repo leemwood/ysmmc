@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import NexusmcAvatar from '@/components/NexusmcAvatar.vue'
+import ResourceCover from '@/components/ResourceCover.vue'
 import {
   Download,
   Eye,
   ExternalLink,
-  ImageOff,
   LogOut,
   RefreshCw,
   Search,
@@ -23,22 +23,22 @@ import {
 } from 'lucide-vue-next'
 import {
   isNexusmcConfigError,
+  NEXUSMC_REGISTER_URL,
+  NEXUSMC_SITE,
   nexusmcApi,
+  normalizeCatalogOptions,
   resourceCover,
   resourceDescription,
+  resourceDetailPath,
   resourceDownloads,
   resourceTags,
   resourceTitle,
   resourceViews,
+  type CatalogOption,
   type NexusmcListResponse,
   type NexusmcResource,
 } from '@/lib/nexusmc'
-import { NEXUSMC_REGISTER_URL, NEXUSMC_SITE, useNexusmcStore } from '@/stores/nexusmc'
-
-interface CatalogOption {
-  value: string
-  label: string
-}
+import { useNexusmcStore } from '@/stores/nexusmc'
 
 const PAGE_SIZE = 20
 
@@ -56,39 +56,11 @@ const categories = ref<CatalogOption[]>([])
 const activeCategory = ref('')
 
 const totalPagesSafe = computed(() => Math.max(totalPages.value, 1))
-const displayName = computed(() => store.user?.username || 'NexusMC 用户')
-
-function extractCategories(data: unknown): CatalogOption[] {
-  const out: CatalogOption[] = []
-  const visit = (node: unknown) => {
-    if (Array.isArray(node)) {
-      for (const entry of node) {
-        if (typeof entry === 'string') {
-          out.push({ value: entry, label: entry })
-        } else if (entry && typeof entry === 'object') {
-          const obj = entry as Record<string, unknown>
-          const value = (obj.value || obj.slug || obj.id || obj.key) as string | undefined
-          const label = (obj.label || obj.name || obj.title || value) as string | undefined
-          if (value && label) out.push({ value: String(value), label: String(label) })
-        }
-      }
-      return
-    }
-    if (node && typeof node === 'object') {
-      for (const value of Object.values(node as Record<string, unknown>)) {
-        if (Array.isArray(value)) visit(value)
-      }
-    }
-  }
-  visit(data)
-  const seen = new Set<string>()
-  return out.filter((o) => (seen.has(o.value) ? false : (seen.add(o.value), true)))
-}
 
 async function fetchCatalog() {
   try {
     const { data } = await nexusmcApi.catalog()
-    categories.value = extractCategories(data)
+    categories.value = normalizeCatalogOptions(data)
   } catch {
     categories.value = []
   }
@@ -153,11 +125,6 @@ function goPage(delta: number) {
   if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function detailTo(item: NexusmcResource) {
-  const id = item.slug || item.id
-  return id ? `/nexusmc/resource/${encodeURIComponent(String(id))}` : ''
-}
-
 onMounted(() => {
   fetchCatalog()
   fetchResources()
@@ -175,7 +142,7 @@ onMounted(() => {
             NexusMC 资源精选站
           </p>
           <h1 class="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
-            {{ store.isLoggedIn ? `欢迎回来，${displayName}` : 'YSM 模型资源精选' }}
+            {{ store.isLoggedIn ? `欢迎回来，${store.displayName}` : 'YSM 模型资源精选' }}
           </h1>
           <p class="mt-2 text-sm text-muted-foreground sm:text-base">
             这里汇集了 NexusMC 社区的公开模型资源。浏览、挑选，一键前往 NexusMC 完成下载——
@@ -204,14 +171,9 @@ onMounted(() => {
 
         <!-- 用户信息卡片 -->
         <div v-if="store.user" class="flex items-center gap-4 rounded-xl border bg-background/80 p-4 lg:w-80">
-          <Avatar class="h-12 w-12 border">
-            <AvatarImage v-if="store.user.avatar" :src="store.user.avatar" :alt="store.user.username" />
-            <span v-else class="flex h-full w-full items-center justify-center rounded-full bg-muted text-lg font-medium">
-              {{ displayName.slice(0, 1).toUpperCase() }}
-            </span>
-          </Avatar>
+          <NexusmcAvatar size="lg" class="border" />
           <div class="min-w-0 flex-1">
-            <div class="truncate font-semibold">{{ displayName }}</div>
+            <div class="truncate font-semibold">{{ store.displayName }}</div>
             <div class="truncate text-xs text-muted-foreground">
               {{ store.user.email || `NexusMC UID ${store.user.uid ?? '—'}` }}
             </div>
@@ -306,21 +268,13 @@ onMounted(() => {
         :key="item.id || item.slug || resourceTitle(item)"
         class="overflow-hidden card-hover group"
       >
-        <RouterLink :to="detailTo(item)" class="block focus-ring">
+        <RouterLink :to="resourceDetailPath(item)" class="block focus-ring">
           <div class="aspect-[4/3] w-full bg-muted overflow-hidden">
-            <img
-              v-if="resourceCover(item)"
-              :src="resourceCover(item)"
-              :alt="resourceTitle(item)"
-              loading="lazy"
-              decoding="async"
-              style="height: 100%; width: 100%; object-fit: contain"
-              class="transition-transform duration-300 group-hover:scale-105"
+            <ResourceCover
+              :cover="resourceCover(item)"
+              :title="resourceTitle(item)"
+              img-class="transition-transform duration-300 group-hover:scale-105"
             />
-            <div v-else class="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-              <ImageOff class="h-10 w-10 opacity-50" />
-              <span class="text-sm">无预览图</span>
-            </div>
           </div>
           <CardContent class="p-4">
             <h3 class="font-semibold line-clamp-1 text-balance group-hover:text-primary transition-colors">

@@ -21,8 +21,10 @@ import (
 
 const (
 	DefaultSiteOrigin = "https://www.nexusmc.cn"
-	// 留空 = 授权请求不带 scope，由 NexusMC 按应用登记的默认权限发放
-	defaultScopes = ""
+	// 个人主页需要读取用户的投稿、收藏与通知，故默认申请这四个 scope。
+	// 若 OAuth 应用未登记对应权限会导致 invalid_scope / unauthorized_client，
+	// 可用 NEXUSMC_OAUTH_SCOPES 环境变量覆盖（留空则不带 scope）。
+	defaultScopes = "user:content:read user:interaction:read user:notification:read user:notification:write"
 )
 
 // ErrNotConfigured means the EdgeOne environment variables for NexusMC are missing.
@@ -381,4 +383,40 @@ func AbsoluteURL(v any) string {
 		return s
 	}
 	return SiteOrigin() + s
+}
+
+// --- OAuth user data (/me/*) -------------------------------------------------
+
+// MeRequest proxies one /api/site/v1/me/* endpoint using the caller's OAuth
+// access token. Unlike SiteGet, responses are private per-user data and must
+// NEVER be cached: no cache lookup and no cache store.
+func MeRequest(method, path string, query url.Values, accessToken string) ([]byte, int, error) {
+	if !SiteConfigured() {
+		return nil, http.StatusServiceUnavailable, ErrNotConfigured
+	}
+	if accessToken == "" {
+		return nil, http.StatusUnauthorized, errors.New("missing oauth access token")
+	}
+	qs := ""
+	if len(query) > 0 {
+		qs = "?" + query.Encode()
+	}
+	req, err := http.NewRequest(method, SiteOrigin()+path+qs, nil)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	req.Header.Set("X-API-Key", APIKey())
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, http.StatusBadGateway, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 5<<20))
+	if err != nil {
+		return nil, http.StatusBadGateway, err
+	}
+	return body, resp.StatusCode, nil
 }

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from 'vue-router'
-import { useNexusmcStore, NEXUSMC_REGISTER_URL } from '@/stores/nexusmc'
+import { useNexusmcStore } from '@/stores/nexusmc'
+import { NEXUSMC_REGISTER_URL, NEXUSMC_SITE } from '@/lib/nexusmc'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import NexusmcAvatar from '@/components/NexusmcAvatar.vue'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -11,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { Menu, X, Home, LogOut, UserPlus, ExternalLink, Sparkles } from 'lucide-vue-next'
+import { Menu, X, Home, LogOut, UserPlus, ExternalLink, Sparkles, UserRound } from 'lucide-vue-next'
 import { ref } from 'vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
@@ -65,16 +66,7 @@ function isActive(path: string) {
                   class="btn-press gap-2 rounded-full pl-1 pr-3 focus-ring"
                   aria-label="NexusMC 用户菜单"
                 >
-                  <Avatar class="h-8 w-8 border">
-                    <AvatarImage
-                      v-if="store.user?.avatar"
-                      :src="store.user.avatar"
-                      :alt="store.user?.username || 'NexusMC 用户'"
-                    />
-                    <span v-else class="flex h-full w-full items-center justify-center rounded-full bg-muted text-sm font-medium">
-                      {{ store.user?.username?.slice(0, 1).toUpperCase() || 'N' }}
-                    </span>
-                  </Avatar>
+                  <NexusmcAvatar size="sm" class="border" />
                   <span class="max-w-32 truncate text-sm font-medium">{{ store.user?.username }}</span>
                 </Button>
               </DropdownMenuTrigger>
@@ -87,8 +79,14 @@ function isActive(path: string) {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem as-child>
+                  <RouterLink to="/me" class="w-full cursor-pointer">
+                    <UserRound class="mr-2 h-4 w-4" />
+                    个人主页
+                  </RouterLink>
+                </DropdownMenuItem>
+                <DropdownMenuItem as-child>
                   <a
-                    :href="NEXUSMC_REGISTER_URL.replace('/register', '')"
+                    :href="NEXUSMC_SITE"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="w-full cursor-pointer"
@@ -194,23 +192,22 @@ function isActive(path: string) {
             <!-- 用户信息 -->
             <div v-if="store.isLoggedIn" class="mt-4 space-y-1 border-t pt-4">
               <div class="flex items-center gap-3 rounded-lg px-3 py-3">
-                <Avatar class="h-9 w-9 border">
-                  <AvatarImage
-                    v-if="store.user?.avatar"
-                    :src="store.user.avatar"
-                    :alt="store.user?.username || 'NexusMC 用户'"
-                  />
-                  <span v-else class="flex h-full w-full items-center justify-center rounded-full bg-muted text-sm font-medium">
-                    {{ store.user?.username?.slice(0, 1).toUpperCase() || 'N' }}
-                  </span>
-                </Avatar>
+                <NexusmcAvatar size="md" class="border" />
                 <div class="min-w-0">
                   <div class="truncate text-sm font-medium">{{ store.user?.username }}</div>
                   <div class="text-xs text-muted-foreground">NexusMC 账号</div>
                 </div>
               </div>
+              <RouterLink
+                to="/me"
+                class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors hover:bg-accent focus-ring"
+                @click="closeMenu"
+              >
+                <UserRound class="h-5 w-5" />
+                个人主页
+              </RouterLink>
               <a
-                :href="NEXUSMC_REGISTER_URL.replace('/register', '')"
+                :href="NEXUSMC_SITE"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors hover:bg-accent focus-ring"
@@ -251,7 +248,7 @@ function isActive(path: string) {
             </template>
           </div>
 
-          <div class="border-t p-4 safe-area-inset">
+          <div class="border-t p-4 pb-safe">
             <div class="flex items-center justify-between">
               <span class="text-sm text-muted-foreground">外观主题</span>
               <ThemeToggle />

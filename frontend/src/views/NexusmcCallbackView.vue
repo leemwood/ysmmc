@@ -4,9 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { setNexusmcUser, type NexusmcUser } from '@/lib/nexusmc'
+import { useNexusmcStore } from '@/stores/nexusmc'
 
 const route = useRoute()
 const router = useRouter()
+const store = useNexusmcStore()
 
 const error = ref('')
 const errorMessages: Record<string, string> = {
@@ -26,7 +28,8 @@ onMounted(() => {
       const user = JSON.parse(rawUser) as NexusmcUser
       if (!user.sub && !user.username) throw new Error('invalid user payload')
       setNexusmcUser(user)
-      void router.replace('/')
+      // 默认回首页；从受保护页面（如 /me）发起登录时回跳原目标
+      void router.replace(store.consumeReturnTo() || '/')
       return
     } catch {
       error.value = '登录数据解析失败，请重新登录。'

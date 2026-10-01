@@ -31,6 +31,14 @@ func main() {
 		g.GET("/search", search)
 		g.GET("/auth/start", authStart)
 		g.GET("/auth/callback", authCallback)
+		g.POST("/auth/logout", authLogout)
+		g.GET("/me/content", meContent)
+		g.GET("/me/favorites", meFavorites)
+		g.GET("/me/likes", meLikes)
+		g.GET("/me/notifications", meNotifications)
+		g.GET("/me/notifications/unread-count", meUnreadCount)
+		g.POST("/me/notifications/read-all", meReadAll)
+		g.POST("/me/notifications/:id/read", meReadOne)
 	}
 
 	// EdgeOne adapts the port automatically; 9000 matches the platform examples.
@@ -41,6 +49,39 @@ func main() {
 
 func isHTTPS(c *gin.Context) bool {
 	return c.Request.TLS != nil || strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https")
+}
+
+// tokenCookieName holds the OAuth access token so the browser can call the
+// /me/* proxies without JavaScript ever touching the token.
+const tokenCookieName = "nexusmc_token"
+
+func setTokenCookie(c *gin.Context, token string, secure bool) {
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     tokenCookieName,
+		Value:    token,
+		Path:     "/api/nexusmc",
+		MaxAge:   7 * 24 * 3600,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func clearTokenCookie(c *gin.Context, secure bool) {
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     tokenCookieName,
+		Value:    "",
+		Path:     "/api/nexusmc",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func authLogout(c *gin.Context) {
+	clearTokenCookie(c, isHTTPS(c))
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func proxyJSON(c *gin.Context, body []byte, status int, err error) {
@@ -192,6 +233,8 @@ func authCallback(c *gin.Context) {
 	if v, ok := profile["email_verified"]; ok && v != nil {
 		user["email_verified"] = v
 	}
+	// 登录成功即下发 httpOnly token cookie，/me/* 代理据此调用上游。
+	setTokenCookie(c, accessToken, https)
 	payload, err := json.Marshal(user)
 	if err != nil {
 		fail("internal")
@@ -199,4 +242,103 @@ func authCallback(c *gin.Context) {
 	}
 	http.Redirect(c.Writer, c.Request,
 		frontend+"/nexusmc/callback?user="+url.QueryEscape(string(payload)), http.StatusFound)
+}
+
+// --- OAuth user data proxies (/me/*) ----------------------------------------
+
+// me/* 响应是按用户隔离的私有数据：只透传 allowlist 参数、绝不缓存，
+// token 缺失或过期时返回 401，由前端引导重新登录。
+var (
+	meContentParams = []string{"type", "status", "page", "pageSize"}
+	meListParams    = []string{"page", "pageSize"}
+)
+
+func filterQuery(q url.Values, allow []string) url.Values {
+	out := url.Values{}
+	for _, k := range allow {
+		if v := q.Get(k); v != "" {
+			out.Set(k, v)
+		}
+	}
+	return out
+}
+
+func meToken(c *gin.Context) string {
+	v, err := c.Cookie(tokenCookieName)
+	if err != nil {
+		return ""
+	}
+	return v
+}
+
+func proxyMe(c *gin.Context, body []byte, status int, err error) {
+	if err != nil {
+		if errors.Is(err, nexusmc.ErrNotConfigured) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error":   "not_configured",
+				"message": "服务端尚未配置 NexusMC 站点 API 凭据（NEXUSMC_SITE_API_KEY）",
+			})
+			return
+		}
+		if status == http.StatusUnauthorized {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error":   "unauthorized",
+				"message": "登录已过期或授权缺少所需权限，请重新登录",
+			})
+			return
+		}
+		c.JSON(http.StatusBadGateway, gin.H{
+			"error":   "upstream_error",
+			"message": err.Error(),
+		})
+		return
+	}
+	c.Data(status, "application/json; charset=utf-8", body)
+}
+
+func meContent(c *gin.Context) {
+	body, status, err := nexusmc.MeRequest(http.MethodGet, "/api/site/v1/me/content",
+		filterQuery(c.Request.URL.Query(), meContentParams), meToken(c))
+	proxyMe(c, body, status, err)
+}
+
+func meFavorites(c *gin.Context) {
+	body, status, err := nexusmc.MeRequest(http.MethodGet, "/api/site/v1/me/favorites",
+		filterQuery(c.Request.URL.Query(), meListParams), meToken(c))
+	proxyMe(c, body, status, err)
+}
+
+func meLikes(c *gin.Context) {
+	body, status, err := nexusmc.MeRequest(http.MethodGet, "/api/site/v1/me/likes",
+		filterQuery(c.Request.URL.Query(), meListParams), meToken(c))
+	proxyMe(c, body, status, err)
+}
+
+func meNotifications(c *gin.Context) {
+	body, status, err := nexusmc.MeRequest(http.MethodGet, "/api/site/v1/me/notifications",
+		filterQuery(c.Request.URL.Query(), meListParams), meToken(c))
+	proxyMe(c, body, status, err)
+}
+
+func meUnreadCount(c *gin.Context) {
+	body, status, err := nexusmc.MeRequest(http.MethodGet, "/api/site/v1/me/notifications/unread-count",
+		url.Values{}, meToken(c))
+	proxyMe(c, body, status, err)
+}
+
+func meReadAll(c *gin.Context) {
+	body, status, err := nexusmc.MeRequest(http.MethodPost, "/api/site/v1/me/notifications/read-all",
+		url.Values{}, meToken(c))
+	proxyMe(c, body, status, err)
+}
+
+func meReadOne(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing_id", "message": "缺少通知 id"})
+		return
+	}
+	body, status, err := nexusmc.MeRequest(http.MethodPost,
+		"/api/site/v1/me/notifications/"+url.PathEscape(id)+"/read", url.Values{}, meToken(c))
+	proxyMe(c, body, status, err)
 }

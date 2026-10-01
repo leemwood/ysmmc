@@ -150,17 +150,6 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-@utility safe-area-inset {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-@utility motion-reduce {
-  @media (prefers-reduced-motion: reduce) {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
 @utility container-app {
   width: 100%;
   max-width: 80rem;
@@ -288,6 +277,13 @@ h1, h2, h3, h4, h5, h6 {
               box-shadow var(--duration-fast) var(--ease-out-expo);
 }
 
+/* 资源封面图：撑满定高容器且不裁切（替代曾经的内联样式） */
+.resource-cover-img {
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+}
+
 .card-hover:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
@@ -314,11 +310,6 @@ h1, h2, h3, h4, h5, h6 {
   background-clip: text;
 }
 
-@utility touch-target {
-  min-height: 44px;
-  min-width: 44px;
-}
-
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -326,12 +317,6 @@ h1, h2, h3, h4, h5, h6 {
 @utility px-safe {
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
-}
-
-@utility motion-safe {
-  @media (prefers-reduced-motion: no-preference) {
-    animation: inherit;
-  }
 }
 
 @keyframes scaleIn {

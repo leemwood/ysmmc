@@ -28,7 +28,12 @@ ysmmc/
 | `GET /api/nexusmc/resource?id=` | 代理资源详情 |
 | `GET /api/nexusmc/search?q=` | 代理全站搜索（仅 resources 类型，需密钥开通 search 权限） |
 | `GET /api/nexusmc/auth/start` | 发起 NexusMC OAuth2 授权（写 state cookie 后 302） |
-| `GET /api/nexusmc/auth/callback` | OAuth2 回调：state 校验 → 换 token → 拉取 userinfo → 302 回前端 `/nexusmc/callback` |
+| `GET /api/nexusmc/auth/callback` | OAuth2 回调：state 校验 → 换 token → 拉取 userinfo → 写 httpOnly token cookie → 302 回前端 `/nexusmc/callback` |
+| `POST /api/nexusmc/auth/logout` | 清除 token cookie（前端退出登录时调用） |
+| `GET /api/nexusmc/me/content` | 我的投稿（需登录，type/status/page/pageSize） |
+| `GET /api/nexusmc/me/favorites` · `/me/likes` | 我的收藏 / 点赞（需登录） |
+| `GET /api/nexusmc/me/notifications` · `/unread-count` | 通知列表 / 未读数（需登录） |
+| `POST /api/nexusmc/me/notifications/read-all` · `/:id/read` | 标记已读（需登录） |
 
 密钥（站点 API Key、OAuth client_secret）只保存在 EdgeOne 环境变量中，浏览器永远
 接触不到——这是 NexusMC 开放平台协议的要求（见
@@ -46,7 +51,10 @@ site-oauth2-provider.md）。
    https://<你的 EdgeOne 域名>/api/nexusmc/auth/callback
    ```
 
-   `redirect_uri` 必须与登记值逐字一致。 scopes 建议 `user:basic user:email`。
+   `redirect_uri` 必须与登记值逐字一致。 scopes 建议 `user:basic user:email`
+   加上个人主页需要的 `user:content:read user:interaction:read
+   user:notification:read user:notification:write`（缺少这些权限时个人主页
+   接口会报 401，页面会引导重新授权）。
    默认请求的 scope 可用环境变量 `NEXUSMC_OAUTH_SCOPES` 覆盖。
 
 ## EdgeOne 环境变量
@@ -60,7 +68,7 @@ site-oauth2-provider.md）。
 | `NEXUSMC_OAUTH_CLIENT_SECRET` | 登录必填 | OAuth 应用完整密钥（`avm_oac_...`，不要截断） |
 | `NEXUSMC_OAUTH_REDIRECT_URI` | 建议 | 回调地址；不设则按请求 Host 自动推导，正式环境建议显式设置 |
 | `NEXUSMC_FRONTEND_ORIGIN` | 可选 | 回调后跳回的前端地址；不设则用请求自身来源 |
-| `NEXUSMC_OAUTH_SCOPES` | 可选 | 默认 `user:basic user:email` |
+| `NEXUSMC_OAUTH_SCOPES` | 可选 | 默认 `user:content:read user:interaction:read user:notification:read user:notification:write`；应用未登记这些权限时可用它改回空串（个人主页将不可用但登录不受影响） |
 | `NEXUSMC_RESOURCE_PLATFORM` | 可选 | 列表默认平台筛选（如 `java`） |
 | `NEXUSMC_RESOURCE_CATEGORY` | 可选 | 列表默认分类筛选（如 YSM 模型对应的分类值，取自 catalog 接口） |
 | `NEXUSMC_SITE_ORIGIN` | 可选 | NexusMC 站点地址，默认 `https://www.nexusmc.cn` |
@@ -97,5 +105,7 @@ NEXUSMC_DEV_TARGET=http://127.0.0.1:8787 pnpm --dir frontend dev
   `page_url`（`https://www.nexusmc.cn/resources/{slug}`）；待拿到真实密钥联调后
   可再收紧。
 - 全站搜索需要站点 API 密钥额外开通 `search:read:public` 业务域，否则返回 403。
-- OAuth 令牌当前只用于登录时读取一次 userinfo，未保存 refresh token；如后续需要
-  代表用户读取收藏/通知，需在服务端持久化令牌。
+- OAuth access token 登录成功后以 httpOnly cookie（`nexusmc_token`，7 天，
+  仅 `/api/nexusmc` 路径可读）保存在浏览器侧，由云函数代理访问 `/me/*` 时附带；
+  令牌不写入 localStorage，前端 JS 接触不到。未保存 refresh token，过期后
+  个人主页接口返回 401，页面引导重新登录。

@@ -19,6 +19,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/NexusmcCallbackView.vue'),
   },
   {
+    path: '/me',
+    name: 'me',
+    component: () => import('@/views/MeView.vue'),
+  },
+  {
     // 兼容旧地址
     path: '/nexusmc',
     redirect: '/',

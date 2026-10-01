@@ -6,17 +6,18 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import NexusmcAvatar from '@/components/NexusmcAvatar.vue'
+import ResourceCover from '@/components/ResourceCover.vue'
 import {
   ArrowLeft,
   Download,
   Eye,
   ExternalLink,
-  ImageOff,
   CalendarDays,
 } from 'lucide-vue-next'
 import {
   isNexusmcConfigError,
+  NEXUSMC_SITE,
   nexusmcApi,
   resourceCover,
   resourceDescription,
@@ -24,10 +25,11 @@ import {
   resourcePageUrl,
   resourceTags,
   resourceTitle,
+  resourceUpdatedAt,
   resourceViews,
   type NexusmcResource,
 } from '@/lib/nexusmc'
-import { NEXUSMC_SITE, useNexusmcStore } from '@/stores/nexusmc'
+import { useNexusmcStore } from '@/stores/nexusmc'
 import { tiptapToHtml } from '@/utils/tiptap'
 
 const route = useRoute()
@@ -41,13 +43,11 @@ const item = ref<NexusmcResource | null>(null)
 const resourceId = computed(() => String(route.params.id || ''))
 const pageUrl = computed(() => (item.value ? resourcePageUrl(item.value) : ''))
 const updatedAt = computed(() => {
-  if (!item.value) return ''
-  const raw = item.value.updated_at || item.value.updatedAt || item.value.updated_at_time
-  if (typeof raw !== 'string' || !raw) return ''
+  const raw = item.value ? resourceUpdatedAt(item.value) : ''
+  if (!raw) return ''
   const date = new Date(raw)
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('zh-CN')
 })
-const displayName = computed(() => store.user?.username || '')
 // TipTap 正文 → 受限 HTML；无正文时回退为简介
 const contentHtml = computed(() => {
   if (!item.value) return ''
@@ -132,16 +132,11 @@ onMounted(fetchDetail)
         <!-- 封面 -->
         <div class="lg:w-3/5">
           <div class="aspect-[16/9] w-full overflow-hidden rounded-xl border bg-muted">
-            <img
-              v-if="resourceCover(item)"
-              :src="resourceCover(item)"
-              :alt="resourceTitle(item)"
-              style="height: 100%; width: 100%; object-fit: contain"
+            <ResourceCover
+              :cover="resourceCover(item)"
+              :title="resourceTitle(item)"
+              icon-class="h-12 w-12"
             />
-            <div v-else class="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-              <ImageOff class="h-12 w-12 opacity-50" />
-              <span class="text-sm">无预览图</span>
-            </div>
           </div>
         </div>
 
@@ -188,14 +183,9 @@ onMounted(fetchDetail)
           <!-- 登录状态 -->
           <div class="mt-4 flex items-center gap-3 rounded-xl border p-3">
             <template v-if="store.user">
-              <Avatar class="h-8 w-8 border">
-                <AvatarImage v-if="store.user.avatar" :src="store.user.avatar" :alt="store.user.username" />
-                <span v-else class="flex h-full w-full items-center justify-center rounded-full bg-muted text-xs font-medium">
-                  {{ displayName.slice(0, 1).toUpperCase() }}
-                </span>
-              </Avatar>
+              <NexusmcAvatar size="xs" class="border" />
               <div class="min-w-0 text-sm">
-                已以 <span class="font-medium">{{ displayName }}</span> 身份浏览，
+                已以 <span class="font-medium">{{ store.displayName }}</span> 身份浏览，
                 <a :href="NEXUSMC_SITE" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">去 NexusMC 互动 →</a>
               </div>
             </template>
