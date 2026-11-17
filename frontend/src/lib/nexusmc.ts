@@ -58,7 +58,12 @@ const api = axios.create({
 })
 
 export function isNexusmcConfigError(error: unknown): boolean {
-  return axios.isAxiosError(error) && error.response?.status === 503
+  if (!axios.isAxiosError(error)) return false
+  const status = error.response?.status
+  const code = error.response?.data?.code
+  return status === 503 ||
+    status === 401 && code === 'SITE_API_KEY_INVALID' ||
+    status === 403 && code === 'SITE_API_KEY_SCOPE_REQUIRED'
 }
 
 export const nexusmcApi = {
@@ -92,9 +97,10 @@ export const nexusmcMeApi = {
   markAllRead: () => api.post('/me/notifications/read-all'),
 }
 
-// 401：token 缺失/过期，或授权未包含所需 scope，需要重新登录
+// 站点密钥故障无法通过用户重新登录解决。
+// 其他 401：token 缺失/过期，或授权未包含所需 scope，需要重新登录。
 export function isNexusmcAuthError(error: unknown): boolean {
-  return axios.isAxiosError(error) && (error.response?.status === 401 ||
+  return axios.isAxiosError(error) && !isNexusmcConfigError(error) && (error.response?.status === 401 ||
     error.response?.status === 403 && error.response?.data?.code === 'OAUTH_SCOPE_REQUIRED')
 }
 

@@ -38,7 +38,7 @@ const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const error = ref('')
-const notConfigured = ref(false)
+const serviceUnavailable = ref(false)
 const items = ref<NexusmcResource[]>([])
 const total = ref(0)
 const totalPages = ref(1)
@@ -71,6 +71,7 @@ async function fetchCatalog() {
 async function fetchResources() {
   loading.value = true
   error.value = ''
+  serviceUnavailable.value = false
   try {
     let data: NexusmcListResponse
     if (keyword.value) {
@@ -91,7 +92,7 @@ async function fetchResources() {
     totalPages.value = data.pagination?.totalPages ?? 1
   } catch (e) {
     if (isNexusmcConfigError(e)) {
-      notConfigured.value = true
+      serviceUnavailable.value = true
     } else {
       error.value = '获取 NexusMC 资源失败，请稍后重试。'
     }
@@ -122,20 +123,22 @@ function goPage(delta: number) {
   if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-onMounted(() => {
+function refresh() {
   fetchCatalog()
   fetchResources()
-})
+}
+
+onMounted(refresh)
 </script>
 
 <template>
   <div class="container-app py-6 sm:py-8">
-    <!-- Not configured banner -->
-    <Alert v-if="notConfigured">
+    <!-- Resource service unavailable -->
+    <Alert v-if="serviceUnavailable">
       <AlertDescription>
-        <span class="font-medium">NexusMC 凭据尚未配置。</span>
-        部署环境缺少 NEXUSMC_SITE_API_KEY 等 EdgeOne 环境变量，资源展示与登录暂不可用。
-        配置步骤见仓库 docs/edgeone-deploy.md。
+        <span class="font-medium">NexusMC 资源服务暂不可用。</span>
+        请稍后重试或联系站点管理员，也可以
+        <a :href="NEXUSMC_SITE + '/resources'" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">前往 NexusMC 浏览资源</a>。
       </AlertDescription>
     </Alert>
 
@@ -147,7 +150,7 @@ onMounted(() => {
     </Alert>
 
     <!-- Toolbar：分类筛选 + 刷新；搜索在顶栏 -->
-    <div class="flex items-center justify-between gap-2" :class="notConfigured || error ? 'mt-6' : ''">
+    <div class="flex items-center justify-between gap-2" :class="serviceUnavailable || error ? 'mt-6' : ''">
       <div v-if="keyword" class="flex min-w-0 items-center gap-2 text-sm">
         <span class="truncate text-muted-foreground">搜索「{{ keyword }}」的结果</span>
         <Button variant="ghost" size="sm" class="btn-press focus-ring shrink-0" @click="clearSearch">
@@ -172,7 +175,7 @@ onMounted(() => {
           class="btn-press focus-ring"
           aria-label="刷新"
           :disabled="loading"
-          @click="fetchResources"
+          @click="refresh"
         >
           <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />
         </Button>
@@ -234,7 +237,7 @@ onMounted(() => {
       </Card>
     </div>
 
-    <div v-else-if="!notConfigured && !error" class="mt-16 text-center">
+    <div v-else-if="!serviceUnavailable && !error" class="mt-16 text-center">
       <p class="text-muted-foreground">暂无 YSM 模型资源。</p>
       <p class="mt-2 text-sm text-muted-foreground/70">
         新模型在 NexusMC 审核通过后会自动出现在这里，

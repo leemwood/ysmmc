@@ -73,7 +73,25 @@ site-oauth2-provider.md）。
 | `NEXUSMC_RESOURCE_CATEGORY` | 可选 | 列表默认分类筛选（如 YSM 模型对应的分类值，取自 catalog 接口） |
 | `NEXUSMC_SITE_ORIGIN` | 可选 | NexusMC 站点地址，默认 `https://www.nexusmc.cn` |
 
-未配置凭据时页面会显示引导横幅，接口返回 503 `not_configured`，不会崩溃。
+未配置凭据时接口返回 503 `not_configured`。缺少凭据、密钥失效或业务权限不足时，
+页面会提示服务暂不可用，并提供 NexusMC 资源库入口。
+
+### 资源接口返回 401 / 403
+
+`/health` 的 `site_api: true` 和 `/config` 的 `configured: true` 仅说明环境变量非空，
+不代表密钥已通过上游验证。检查 `/api/nexusmc/resources` 或 `/api/nexusmc/catalog`
+响应体中的 `code`：
+
+- `401 SITE_API_KEY_INVALID`：NexusMC 拒绝了服务端站点密钥。到 NexusMC 开放平台
+  检查密钥是否启用、到期或被撤销；必要时创建或轮换密钥，将完整值更新到 EdgeOne
+  对应部署环境的 `NEXUSMC_SITE_API_KEY`，然后重新部署云函数。完整密钥仅在创建或
+  轮换时显示一次，请勿使用被遮盖的展示值、OAuth 应用密钥或用户 token。
+- `403 SITE_API_KEY_SCOPE_REQUIRED`：站点密钥缺少业务权限。为列表、目录和详情开启
+  `resource:read:public`，为搜索开启 `search:read:public`。
+
+站点密钥错误无法通过用户重新登录解决。密钥只在服务端配置，不要写进前端、仓库、
+日志或聊天；部署完成后再次请求上述接口确认返回 200。代码会去除密钥两端的空白，
+但无法修复已过期、已撤销或填写错误的密钥。
 
 ## 部署步骤
 
@@ -96,7 +114,7 @@ edgeone makers dev          # 端口以 CLI 输出为准，假设 8787
 NEXUSMC_DEV_TARGET=http://127.0.0.1:8787 pnpm --dir frontend dev
 ```
 
-不启动云函数时，`/nexusmc` 页面会正常渲染并显示「凭据尚未配置」横幅。
+不启动云函数时，`/nexusmc` 页面仍会渲染，并提示资源加载失败。
 
 ## 已知限制
 

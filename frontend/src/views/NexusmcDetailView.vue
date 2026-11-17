@@ -69,7 +69,7 @@ async function fetchDetail() {
     }
   } catch (e) {
     if (isNexusmcConfigError(e)) {
-      error.value = 'not_configured'
+      error.value = 'service_unavailable'
     } else {
       notFound.value = true
     }
@@ -101,11 +101,11 @@ onMounted(fetchDetail)
 
     <!-- Error / fallback：详情缺失时仍给出 NexusMC 出口，保证引流不中断 -->
     <template v-else-if="notFound || error">
-      <Alert class="mt-6" :variant="error === 'not_configured' ? 'default' : 'destructive'">
+      <Alert class="mt-6" :variant="error === 'service_unavailable' ? 'default' : 'destructive'">
         <AlertDescription>
-          <template v-if="error === 'not_configured'">
-            <span class="font-medium">NexusMC 凭据尚未配置。</span>
-            详情展示暂不可用，可直接前往 NexusMC 浏览该资源。
+          <template v-if="error === 'service_unavailable'">
+            <span class="font-medium">NexusMC 资源服务暂不可用。</span>
+            请稍后重试或联系站点管理员，也可直接前往 NexusMC 浏览资源。
           </template>
           <template v-else>
             <span class="font-medium">未能获取资源详情。</span>

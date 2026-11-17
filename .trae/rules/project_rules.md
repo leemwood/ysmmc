@@ -83,6 +83,8 @@ uploads/
 
 ## 部署记录
 - 已更新 `.gitignore` 文件以符合生产环境部署要求，包括忽略环境文件、日志、IDE 配置等。
+- NexusMC 资源接口返回 `SITE_API_KEY_INVALID` 时，应在 EdgeOne 更新有效的 `NEXUSMC_SITE_API_KEY` 并重新部署；不能引导用户重新登录，也不能仅凭 `/config` 的非空检测判断密钥有效。
+- PWA Manifest 和 Apple Touch Icon 引用的图片必须真实存在，发布前验证构建产物的 PNG 格式和尺寸，避免缺失文件被 SPA 回退为 HTML。
 
 ## 安全修复记录 (2026-03-06)
 

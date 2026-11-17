@@ -42,7 +42,7 @@ func env(key, fallback string) string {
 func SiteOrigin() string {
 	return strings.TrimRight(env("NEXUSMC_SITE_ORIGIN", DefaultSiteOrigin), "/")
 }
-func APIKey() string            { return os.Getenv("NEXUSMC_SITE_API_KEY") }
+func APIKey() string            { return strings.TrimSpace(os.Getenv("NEXUSMC_SITE_API_KEY")) }
 func OAuthClientID() string     { return os.Getenv("NEXUSMC_OAUTH_CLIENT_ID") }
 func OAuthClientSecret() string { return os.Getenv("NEXUSMC_OAUTH_CLIENT_SECRET") }
 func Scopes() string {

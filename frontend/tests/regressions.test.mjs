@@ -5,11 +5,13 @@ import vm from 'node:vm'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRenderer, nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { AxiosError } from 'axios'
 import { tiptapToHtml } from '../src/utils/tiptap.ts'
 import { useNexusmcStore } from '../src/stores/nexusmc.ts'
-import { nexusmcMeApi } from '../src/lib/nexusmc.ts'
+import { isNexusmcAuthError, isNexusmcConfigError, nexusmcApi, nexusmcMeApi } from '../src/lib/nexusmc.ts'
 import CallbackView from '../src/views/NexusmcCallbackView.vue'
 import MeView from '../src/views/MeView.vue'
+import ModelsView from '../src/views/NexusmcModelsView.vue'
 
 const storage = new Map()
 globalThis.localStorage = {
@@ -45,6 +47,73 @@ const renderer = createRenderer({
   },
   parentNode: (node) => node.parent,
   nextSibling: (node) => node.parent?.children[node.parent.children.indexOf(node) + 1] ?? null,
+})
+
+function apiError(status, code) {
+  return new AxiosError('NexusMC request failed', undefined, undefined, undefined, { status, data: { code } })
+}
+
+function texts(node) {
+  return [node.text, ...node.children.flatMap(texts)]
+}
+
+function findNode(node, predicate) {
+  if (predicate(node)) return node
+  for (const child of node.children) {
+    const found = findNode(child, predicate)
+    if (found) return found
+  }
+}
+
+test('站点密钥错误与用户登录过期分开处理', () => {
+  for (const error of [apiError(401, 'SITE_API_KEY_INVALID'), apiError(403, 'SITE_API_KEY_SCOPE_REQUIRED'), apiError(503, 'not_configured')]) {
+    assert.equal(isNexusmcConfigError(error), true)
+    assert.equal(isNexusmcAuthError(error), false)
+  }
+  for (const error of [apiError(401, 'OAUTH_TOKEN_INVALID'), apiError(403, 'OAUTH_SCOPE_REQUIRED')]) {
+    assert.equal(isNexusmcConfigError(error), false)
+    assert.equal(isNexusmcAuthError(error), true)
+  }
+  assert.equal(isNexusmcConfigError(new Error('network unavailable')), false)
+  assert.equal(isNexusmcConfigError(apiError(403, 'RESOURCE_FORBIDDEN')), false)
+})
+
+test('资源页在密钥失效时提示服务不可用，刷新成功后恢复列表和分类', async () => {
+  const catalog = nexusmcApi.catalog
+  const resources = nexusmcApi.resources
+  let available = false
+  nexusmcApi.catalog = async () => {
+    if (!available) throw apiError(401, 'SITE_API_KEY_INVALID')
+    return { data: ['ysm'] }
+  }
+  nexusmcApi.resources = async () => {
+    if (!available) throw apiError(401, 'SITE_API_KEY_INVALID')
+    return { data: { items: [], pagination: { total: 0, totalPages: 1 } } }
+  }
+  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: ModelsView }] })
+  await router.push('/')
+  const root = element()
+  const app = renderer.createApp(ModelsView)
+  try {
+    app.use(router).mount(root)
+    await new Promise((resolve) => setImmediate(resolve))
+    await nextTick()
+    assert.ok(texts(root).join('').includes('资源服务暂不可用'))
+    assert.ok(!texts(root).join('').includes('暂无 YSM 模型资源'))
+    available = true
+    const refresh = findNode(root, (node) => node['aria-label'] === '刷新')
+    assert.ok(refresh, 'refresh action must remain available')
+    refresh.onClick()
+    await new Promise((resolve) => setImmediate(resolve))
+    await nextTick()
+    assert.ok(!texts(root).join('').includes('资源服务暂不可用'))
+    assert.ok(texts(root).join('').includes('暂无 YSM 模型资源'))
+    assert.ok(findNode(root, (node) => node.tag === 'option' && node.text === 'ysm'))
+  } finally {
+    app.unmount()
+    nexusmcApi.catalog = catalog
+    nexusmcApi.resources = resources
+  }
 })
 
 test('OAuth 回调更新已初始化的 store，并返回来源页', async () => {

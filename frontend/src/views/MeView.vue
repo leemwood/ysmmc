@@ -21,6 +21,7 @@ import {
 } from 'lucide-vue-next'
 import {
   isNexusmcAuthError,
+  isNexusmcConfigError,
   nexusmcMeApi,
   resourceCover,
   resourcePageUrl,
@@ -116,9 +117,13 @@ function createListState(loader: (page: number, pageSize: number) => Promise<Axi
       page.value = targetPage
       loaded.value = true
     } catch (e) {
-      error.value = isNexusmcAuthError(e)
-        ? '登录已过期，或授权未包含个人数据权限，请重新登录。'
-        : '加载失败，请稍后重试。'
+      if (isNexusmcConfigError(e)) {
+        error.value = 'NexusMC 服务暂不可用，请稍后重试或联系站点管理员。'
+      } else if (isNexusmcAuthError(e)) {
+        error.value = '登录已过期，或授权未包含个人数据权限，请重新登录。'
+      } else {
+        error.value = '加载失败，请稍后重试。'
+      }
       items.value = []
     } finally {
       loading.value = false
