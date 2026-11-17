@@ -2,11 +2,9 @@ package handler
 
 import (
 	"path/filepath"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/ysmmc/backend/internal/config"
 	"github.com/ysmmc/backend/internal/middleware"
 	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
@@ -55,6 +53,9 @@ func (h *ModelVersionHandler) ListVersions(c *gin.Context) {
 		return
 	}
 
+	if _, ok := visibleModel(c, modelID); !ok {
+		return
+	}
 	versions, err := h.versionService.ListVersions(modelID)
 	if err != nil {
 		response.InternalError(c, "failed to fetch versions")
@@ -75,6 +76,18 @@ func (h *ModelVersionHandler) GetVersion(c *gin.Context) {
 	if err != nil {
 		response.NotFound(c, "version not found")
 		return
+	}
+	if version.ModelID.String() != c.Param("id") {
+		response.NotFound(c, "version not found")
+		return
+	}
+	m, ok := visibleModel(c, version.ModelID)
+	if !ok {
+		return
+	}
+	if !canManageModel(c, m) {
+		public := publicModel(*m)
+		version.Model = &public
 	}
 
 	response.Success(c, version)
@@ -174,7 +187,7 @@ func (h *ModelVersionHandler) DownloadVersion(c *gin.Context) {
 		return
 	}
 
-	if version.Model.Status != "approved" {
+	if version.ModelID.String() != c.Param("id") || version.Model.Status != "approved" || !version.Model.IsPublic {
 		response.Forbidden(c, "model is not available for download")
 		return
 	}
@@ -205,17 +218,16 @@ func (h *ModelVersionHandler) ServeVersionFile(c *gin.Context) {
 		return
 	}
 
-	if version.Model.Status != "approved" {
+	if version.ModelID.String() != c.Param("id") || version.Model.Status != "approved" || !version.Model.IsPublic {
 		response.Forbidden(c, "model is not available for download")
 		return
 	}
 
-	filePath := version.FilePath
-	if strings.HasPrefix(filePath, "/uploads/") {
-		filePath = strings.TrimPrefix(filePath, "/uploads/")
+	fullPath, err := service.ResolveUploadPath(version.FilePath, "models")
+	if err != nil {
+		response.NotFound(c, "file not found")
+		return
 	}
-
-	fullPath := filepath.Join(config.AppConfig.UploadPath, filePath)
 
 	fileName := version.Model.Title + "-" + version.VersionNumber
 	ext := filepath.Ext(version.FilePath)

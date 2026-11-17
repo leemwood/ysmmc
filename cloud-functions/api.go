@@ -80,6 +80,7 @@ func clearTokenCookie(c *gin.Context, secure bool) {
 }
 
 func authLogout(c *gin.Context) {
+	c.Header("Cache-Control", "private, no-store")
 	clearTokenCookie(c, isHTTPS(c))
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
@@ -151,6 +152,7 @@ func search(c *gin.Context) {
 }
 
 func authStart(c *gin.Context) {
+	c.Header("Cache-Control", "private, no-store")
 	if !nexusmc.OAuthConfigured() {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error":   "oauth_not_configured",
@@ -171,6 +173,7 @@ func authStart(c *gin.Context) {
 }
 
 func authCallback(c *gin.Context) {
+	c.Header("Cache-Control", "private, no-store")
 	https := isHTTPS(c)
 	frontend := nexusmc.FrontendOrigin(c.Request.Host, c.Request.TLS != nil, c.GetHeader("X-Forwarded-Proto"), c.GetHeader("X-Forwarded-Host"))
 	fail := func(code string, detail ...string) {
@@ -272,6 +275,8 @@ func meToken(c *gin.Context) string {
 }
 
 func proxyMe(c *gin.Context, body []byte, status int, err error) {
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("Vary", "Cookie")
 	if err != nil {
 		if errors.Is(err, nexusmc.ErrNotConfigured) {
 			c.JSON(http.StatusServiceUnavailable, gin.H{

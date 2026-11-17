@@ -39,15 +39,22 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-func SiteOrigin() string         { return strings.TrimRight(env("NEXUSMC_SITE_ORIGIN", DefaultSiteOrigin), "/") }
-func APIKey() string             { return os.Getenv("NEXUSMC_SITE_API_KEY") }
-func OAuthClientID() string      { return os.Getenv("NEXUSMC_OAUTH_CLIENT_ID") }
-func OAuthClientSecret() string  { return os.Getenv("NEXUSMC_OAUTH_CLIENT_SECRET") }
-func Scopes() string             { return env("NEXUSMC_OAUTH_SCOPES", defaultScopes) }
-func ResourcePlatform() string   { return os.Getenv("NEXUSMC_RESOURCE_PLATFORM") }
-func ResourceCategory() string   { return os.Getenv("NEXUSMC_RESOURCE_CATEGORY") }
+func SiteOrigin() string {
+	return strings.TrimRight(env("NEXUSMC_SITE_ORIGIN", DefaultSiteOrigin), "/")
+}
+func APIKey() string            { return os.Getenv("NEXUSMC_SITE_API_KEY") }
+func OAuthClientID() string     { return os.Getenv("NEXUSMC_OAUTH_CLIENT_ID") }
+func OAuthClientSecret() string { return os.Getenv("NEXUSMC_OAUTH_CLIENT_SECRET") }
+func Scopes() string {
+	if value, exists := os.LookupEnv("NEXUSMC_OAUTH_SCOPES"); exists {
+		return strings.TrimSpace(value)
+	}
+	return defaultScopes
+}
+func ResourcePlatform() string    { return os.Getenv("NEXUSMC_RESOURCE_PLATFORM") }
+func ResourceCategory() string    { return os.Getenv("NEXUSMC_RESOURCE_CATEGORY") }
 func ResourceSubCategory() string { return os.Getenv("NEXUSMC_RESOURCE_SUB_CATEGORY") }
-func FrontendOriginEnv() string  { return strings.TrimRight(os.Getenv("NEXUSMC_FRONTEND_ORIGIN"), "/") }
+func FrontendOriginEnv() string   { return strings.TrimRight(os.Getenv("NEXUSMC_FRONTEND_ORIGIN"), "/") }
 
 func SiteConfigured() bool  { return APIKey() != "" }
 func OAuthConfigured() bool { return OAuthClientID() != "" && OAuthClientSecret() != "" }

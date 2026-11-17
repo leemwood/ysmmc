@@ -12,6 +12,8 @@ import (
 
 type FileService struct{}
 
+var ErrFileForbidden = errors.New("无权删除其他用户的文件")
+
 func NewFileService() *FileService {
 	return &FileService{}
 }
@@ -69,8 +71,19 @@ func (s *FileService) GetFileData(id uuid.UUID) ([]byte, string, error) {
 	return file.Data, file.MimeType, nil
 }
 
-func (s *FileService) DeleteFile(id uuid.UUID) error {
-	result := database.DB.Delete(&model.File{}, "id = ?", id)
+func (s *FileService) DeleteOwnedFile(id, userID uuid.UUID, isAdmin bool) error {
+	file, err := s.GetFile(id)
+	if err != nil {
+		return err
+	}
+	if !isAdmin && (file.UserID == nil || *file.UserID != userID) {
+		return ErrFileForbidden
+	}
+	query := database.DB.Where("id = ?", id)
+	if !isAdmin {
+		query = query.Where("user_id = ?", userID)
+	}
+	result := query.Delete(&model.File{})
 	if result.Error != nil {
 		return result.Error
 	}

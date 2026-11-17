@@ -31,6 +31,12 @@ func (h *FavoriteHandler) List(c *gin.Context) {
 		response.InternalError(c, "failed to fetch favorites")
 		return
 	}
+	for i := range favorites {
+		if favorites[i].Model != nil {
+			public := publicModel(*favorites[i].Model)
+			favorites[i].Model = &public
+		}
+	}
 
 	response.Paginated(c, favorites, total, page, pageSize)
 }

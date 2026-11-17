@@ -72,6 +72,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        importScripts: ['/clear-legacy-api-cache.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // 云函数路由（OAuth 回调等）是真实服务端端点，
         // 不能被 navigateFallback 拦截成 index.html
@@ -106,18 +107,9 @@ export default defineConfig({
             }
           },
           {
+            // API 包含凭据及个人数据，统一走网络，避免旧缓存跨账号复用。
             urlPattern: /\/api\//,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 5
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
+            handler: 'NetworkOnly',
           }
         ]
       }

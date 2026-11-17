@@ -44,6 +44,7 @@ type ModelPendingChanges struct {
 	Description *string    `json:"description,omitempty"`
 	Tags        []string   `json:"tags,omitempty"`
 	FilePath    *string    `json:"file_path,omitempty"`
+	FileSize    *int64     `json:"file_size,omitempty"`
 	ImageURL    *string    `json:"image_url,omitempty"`
 	ImageID     *uuid.UUID `json:"image_id,omitempty"`
 	IsPublic    *bool      `json:"is_public,omitempty"`
@@ -61,7 +62,7 @@ func (m *ModelPendingChanges) Scan(value interface{}) error {
 }
 
 func (m ModelPendingChanges) Value() (driver.Value, error) {
-	if m.Title == nil && m.Description == nil && m.Tags == nil && m.FilePath == nil && m.ImageURL == nil && m.ImageID == nil && m.IsPublic == nil {
+	if m.Title == nil && m.Description == nil && m.Tags == nil && m.FilePath == nil && m.FileSize == nil && m.ImageURL == nil && m.ImageID == nil && m.IsPublic == nil {
 		return nil, nil
 	}
 	return json.Marshal(m)

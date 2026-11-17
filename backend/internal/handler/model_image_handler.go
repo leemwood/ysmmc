@@ -51,6 +51,9 @@ func (h *ModelImageHandler) ListImages(c *gin.Context) {
 		return
 	}
 
+	if _, ok := visibleModel(c, modelID); !ok {
+		return
+	}
 	images, err := h.imageService.ListImages(modelID)
 	if err != nil {
 		response.InternalError(c, "failed to fetch images")

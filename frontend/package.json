@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
+    "test:sw": "node --test tests/service-worker.check.mjs",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview"
   },

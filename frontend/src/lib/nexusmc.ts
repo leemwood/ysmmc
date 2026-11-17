@@ -87,14 +87,15 @@ export const nexusmcMeApi = {
     api.get<NexusmcMeListResponse>('/me/likes', { params }),
   notifications: (params: Record<string, string | number | undefined> = {}) =>
     api.get<NexusmcMeListResponse>('/me/notifications', { params }),
-  unreadCount: () => api.get<{ unread?: number; [key: string]: unknown }>('/me/notifications/unread-count'),
+  unreadCount: () => api.get<{ count: number; [key: string]: unknown }>('/me/notifications/unread-count'),
   markRead: (id: string | number) => api.post(`/me/notifications/${encodeURIComponent(String(id))}/read`),
   markAllRead: () => api.post('/me/notifications/read-all'),
 }
 
 // 401：token 缺失/过期，或授权未包含所需 scope，需要重新登录
 export function isNexusmcAuthError(error: unknown): boolean {
-  return axios.isAxiosError(error) && error.response?.status === 401
+  return axios.isAxiosError(error) && (error.response?.status === 401 ||
+    error.response?.status === 403 && error.response?.data?.code === 'OAUTH_SCOPE_REQUIRED')
 }
 
 const USER_KEY = 'nexusmc_user'

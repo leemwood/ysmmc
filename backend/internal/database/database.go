@@ -37,6 +37,10 @@ func Connect() error {
 }
 
 func Migrate() error {
+	// 上传归属校验依赖此表；创建失败时不能继续提供上传服务。
+	if err := DB.AutoMigrate(&model.ModelUpload{}); err != nil {
+		return fmt.Errorf("model upload migration failed: %w", err)
+	}
 	if err := migrateSuperAdminRole(); err != nil {
 		log.Printf("Warning: failed to migrate super admin role: %v", err)
 	}
@@ -132,13 +136,13 @@ func Seed() error {
 	}
 
 	superAdmin := model.User{
-		ID:                uuid.New(),
-		Email:             "admin@ysmmc.local",
-		PasswordHash:      string(passwordHash),
-		Username:          "admin",
-		Role:              "super_admin",
-		ProfileStatus:     "approved",
-		EmailVerified:     true,
+		ID:                 uuid.New(),
+		Email:              "admin@ysmmc.local",
+		PasswordHash:       string(passwordHash),
+		Username:           "admin",
+		Role:               "super_admin",
+		ProfileStatus:      "approved",
+		EmailVerified:      true,
 		MustChangePassword: true,
 	}
 

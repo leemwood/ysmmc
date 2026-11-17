@@ -3,13 +3,9 @@ package service
 import (
 	"errors"
 	"log"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"github.com/ysmmc/backend/internal/config"
 	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/repository"
 )
@@ -52,13 +48,17 @@ func (s *ModelService) Create(userID uuid.UUID, req *CreateModelRequest) (*model
 	if req.ImageID == nil && req.ImageURL == nil {
 		return nil, errors.New("card preview image is required")
 	}
+	filePath, fileSize, err := validateModelUpload(userID, req.FilePath)
+	if err != nil {
+		return nil, err
+	}
 
 	m := &model.Model{
 		UserID:      userID,
 		Title:       req.Title,
 		Description: req.Description,
-		FilePath:    req.FilePath,
-		FileSize:    req.FileSize,
+		FilePath:    filePath,
+		FileSize:    fileSize,
 		ImageURL:    req.ImageURL,
 		ImageID:     req.ImageID,
 		Tags:        pq.StringArray(req.Tags),
@@ -85,6 +85,13 @@ func (s *ModelService) Update(modelID, userID uuid.UUID, req *UpdateModelRequest
 
 	if m.UserID != userID && !isAdmin {
 		return nil, errors.New("unauthorized")
+	}
+	if req.FilePath != nil && *req.FilePath != m.FilePath {
+		filePath, fileSize, err := validateModelUpload(userID, *req.FilePath)
+		if err != nil {
+			return nil, err
+		}
+		req.FilePath, req.FileSize = &filePath, &fileSize
 	}
 
 	if isAdmin {
@@ -117,6 +124,7 @@ func (s *ModelService) Update(modelID, userID uuid.UUID, req *UpdateModelRequest
 			Title:       req.Title,
 			Description: req.Description,
 			FilePath:    req.FilePath,
+			FileSize:    req.FileSize,
 			ImageURL:    req.ImageURL,
 			ImageID:     req.ImageID,
 			Tags:        req.Tags,
@@ -177,8 +185,8 @@ func (s *ModelService) Delete(modelID, userID uuid.UUID, isAdmin bool) error {
 	}
 
 	for _, v := range versions {
-		if v.FilePath != "" {
-			os.Remove(v.FilePath)
+		if err := removeUpload(v.FilePath, "models"); err != nil {
+			log.Printf("Delete: skipped unsafe or unavailable version file: %v", err)
 		}
 	}
 
@@ -189,7 +197,7 @@ func (s *ModelService) Delete(modelID, userID uuid.UUID, isAdmin bool) error {
 
 	fileService := NewFileService()
 	for _, fileID := range fileIDsToDelete {
-		if err := fileService.DeleteFile(fileID); err != nil {
+		if err := fileService.DeleteOwnedFile(fileID, m.UserID, false); err != nil {
 			log.Printf("Delete: error deleting file %s: %v", fileID, err)
 		}
 	}
@@ -202,33 +210,8 @@ func (s *ModelService) Delete(modelID, userID uuid.UUID, isAdmin bool) error {
 }
 
 func deleteModelFiles(m *model.Model) error {
-	cfg := config.AppConfig
-
-	// Delete model file
-	if m.FilePath != "" {
-		// FilePath stored in DB is usually the full relative path from upload dir or absolute path
-		// If it's relative to CWD (where binary runs), we can just remove it
-		if err := os.Remove(m.FilePath); err != nil && !os.IsNotExist(err) {
-			// Log error?
-		}
-	}
-
-	// Delete image file if it's stored locally
-	if m.ImageURL != nil && *m.ImageURL != "" {
-		imageURL := *m.ImageURL
-		// Check if it's a local file (e.g. starts with /uploads/)
-		if strings.HasPrefix(imageURL, "/uploads/") {
-			// Remove /uploads/ prefix
-			relPath := strings.TrimPrefix(imageURL, "/uploads/")
-			// Construct full path
-			fullPath := filepath.Join(cfg.UploadPath, relPath)
-			if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
-				// Log error?
-			}
-		}
-	}
-
-	return nil
+	// 旧图片 URL 没有上传归属记录，只解除引用，不据此删除磁盘文件。
+	return removeUpload(m.FilePath, "models")
 }
 
 func (s *ModelService) ListPublic(page, pageSize int, search, sort string) ([]model.Model, int64, error) {
@@ -237,6 +220,10 @@ func (s *ModelService) ListPublic(page, pageSize int, search, sort string) ([]mo
 
 func (s *ModelService) ListByUserID(userID uuid.UUID, page, pageSize int) ([]model.Model, int64, error) {
 	return s.modelRepo.ListByUserID(userID, page, pageSize)
+}
+
+func (s *ModelService) ListPublicByUserID(userID uuid.UUID, page, pageSize int) ([]model.Model, int64, error) {
+	return s.modelRepo.ListPublicByUserID(userID, page, pageSize)
 }
 
 func (s *ModelService) IncrementDownloads(id uuid.UUID) error {
@@ -262,6 +249,9 @@ func (s *ModelService) Approve(modelID uuid.UUID) error {
 		}
 		if m.PendingChanges.FilePath != nil {
 			m.FilePath = *m.PendingChanges.FilePath
+		}
+		if m.PendingChanges.FileSize != nil {
+			m.FileSize = *m.PendingChanges.FileSize
 		}
 		if m.PendingChanges.ImageURL != nil {
 			m.ImageURL = m.PendingChanges.ImageURL

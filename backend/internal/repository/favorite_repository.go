@@ -39,11 +39,13 @@ func (r *FavoriteRepository) ListByUserID(userID uuid.UUID, page, pageSize int) 
 	var favorites []model.Favorite
 	var total int64
 
-	query := database.DB.Model(&model.Favorite{}).Where("user_id = ?", userID)
+	query := database.DB.Model(&model.Favorite{}).
+		Joins("JOIN models ON models.id = favorites.model_id").
+		Where("favorites.user_id = ? AND models.status = ? AND models.is_public = ?", userID, "approved", true)
 	query.Count(&total)
 
 	offset := (page - 1) * pageSize
-	err := query.Preload("Model.User").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&favorites).Error
+	err := query.Preload("Model.User").Offset(offset).Limit(pageSize).Order("favorites.created_at DESC").Find(&favorites).Error
 	return favorites, total, err
 }
 

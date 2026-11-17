@@ -167,7 +167,7 @@ function changeStatus() {
 async function refreshUnread() {
   try {
     const { data } = await nexusmcMeApi.unreadCount()
-    unread.value = typeof data.unread === 'number' ? data.unread : 0
+    unread.value = typeof data.count === 'number' ? data.count : 0
   } catch {
     unread.value = 0
   }

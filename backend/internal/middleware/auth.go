@@ -6,13 +6,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ysmmc/backend/internal/model"
+	"github.com/ysmmc/backend/internal/repository"
 	"github.com/ysmmc/backend/pkg/auth"
 	"github.com/ysmmc/backend/pkg/response"
 )
 
 func Auth() gin.HandlerFunc {
+	return authenticate(true)
+}
+
+// OptionalAuth 允许匿名读取公开资源；提供凭据时必须验证当前账号状态。
+func OptionalAuth() gin.HandlerFunc {
+	return authenticate(false)
+}
+
+func authenticate(required bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" && !required {
+			c.Next()
+			return
+		}
 		if authHeader == "" {
 			response.Unauthorized(c, "missing authorization header")
 			c.Abort()
@@ -32,10 +46,17 @@ func Auth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		user, err := repository.NewUserRepository().FindByID(claims.UserID)
+		if err != nil || user.IsBanned || user.Role != claims.Role {
+			response.Unauthorized(c, "account unavailable or permissions changed, please log in again")
+			c.Abort()
+			return
+		}
 
-		c.Set("user_id", claims.UserID)
-		c.Set("email", claims.Email)
-		c.Set("role", claims.Role)
+		c.Header("Cache-Control", "private, no-store")
+		c.Set("user_id", user.ID)
+		c.Set("email", user.Email)
+		c.Set("role", user.Role)
 		c.Next()
 	}
 }

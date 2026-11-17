@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"io"
 	"log"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ysmmc/backend/internal/config"
+	"github.com/ysmmc/backend/internal/database"
+	"github.com/ysmmc/backend/internal/middleware"
+	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
 )
@@ -72,6 +76,17 @@ func (h *UploadHandler) UploadModel(c *gin.Context) {
 	savedPath, err := h.storageService.SaveFile("models", filename, multiReader)
 	if err != nil {
 		response.InternalError(c, "failed to save file")
+		return
+	}
+	savedPath = filepath.ToSlash(savedPath)
+	upload := model.ModelUpload{
+		Path:   "/uploads/" + savedPath,
+		UserID: middleware.GetUserID(c),
+		Size:   header.Size,
+	}
+	if err := database.DB.Create(&upload).Error; err != nil {
+		_ = h.storageService.DeleteFile("models", filename)
+		response.InternalError(c, "failed to record uploaded file")
 		return
 	}
 
@@ -251,14 +266,23 @@ func (h *UploadHandler) ServeModelFile(c *gin.Context) {
 		return
 	}
 
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
-		response.BadRequest(c, "invalid filename")
+	modelPath, err := service.ResolveUploadPath("models/"+filename, "models")
+	if err != nil {
+		response.NotFound(c, "model file not found")
 		return
 	}
-
-	modelPath := h.storageService.GetFilePath("models", filename)
-
-	if !h.storageService.FileExists("models", filename) {
+	// 原始文件地址也必须归属于已审核且公开的模型。
+	rel := "models/" + filename
+	paths := []string{rel, "/uploads/" + rel}
+	var count int64
+	err = database.DB.Model(&model.Model{}).
+		Where("status = ? AND is_public = ? AND file_path IN ?", "approved", true, paths).Count(&count).Error
+	if err == nil && count == 0 {
+		err = database.DB.Model(&model.ModelVersion{}).
+			Joins("JOIN models ON models.id = model_versions.model_id").
+			Where("models.status = ? AND models.is_public = ? AND model_versions.file_path IN ?", "approved", true, paths).Count(&count).Error
+	}
+	if err != nil || count == 0 {
 		response.NotFound(c, "model file not found")
 		return
 	}
@@ -275,4 +299,3 @@ func (h *UploadHandler) DeleteModel(filename string) error {
 func (h *UploadHandler) DeleteImage(filename string) error {
 	return h.storageService.DeleteFile("images", filename)
 }
-

@@ -71,13 +71,13 @@ func ParseToken(tokenString string) (*Claims, error) {
 
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(cfg.JWTSecret), nil
-	})
+	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithIssuer("ysmmc"), jwt.WithExpirationRequired())
 
 	if err != nil {
 		return nil, err
 	}
 
-	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid && claims.UserID != uuid.Nil {
 		return claims, nil
 	}
 
@@ -89,7 +89,7 @@ func ParseRefreshToken(tokenString string) (uuid.UUID, error) {
 
 	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(cfg.JWTSecret), nil
-	})
+	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithIssuer("ysmmc-refresh"), jwt.WithExpirationRequired())
 
 	if err != nil {
 		return uuid.Nil, err

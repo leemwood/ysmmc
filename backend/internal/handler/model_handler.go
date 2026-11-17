@@ -1,15 +1,12 @@
 package handler
 
 import (
-	"log"
-	"os"
+	"errors"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/ysmmc/backend/internal/config"
 	"github.com/ysmmc/backend/internal/middleware"
 	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
@@ -50,6 +47,9 @@ func (h *ModelHandler) List(c *gin.Context) {
 		response.InternalError(c, "failed to fetch models")
 		return
 	}
+	for i := range models {
+		models[i] = publicModel(models[i])
+	}
 
 	response.Paginated(c, models, total, page, pageSize)
 }
@@ -61,10 +61,13 @@ func (h *ModelHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	model, err := h.modelService.GetByID(id)
-	if err != nil {
-		response.NotFound(c, "model not found")
+	model, ok := visibleModel(c, id)
+	if !ok {
 		return
+	}
+	if !canManageModel(c, model) {
+		public := publicModel(*model)
+		model = &public
 	}
 
 	if model.Status == "approved" && model.IsPublic {
@@ -99,6 +102,10 @@ func (h *ModelHandler) Create(c *gin.Context) {
 
 	model, err := h.modelService.Create(userID, &req)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidUpload) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		response.InternalError(c, "failed to create model")
 		return
 	}
@@ -164,7 +171,7 @@ func (h *ModelHandler) Download(c *gin.Context) {
 		return
 	}
 
-	if model.Status != "approved" {
+	if model.Status != "approved" || !model.IsPublic {
 		response.Forbidden(c, "model is not available for download")
 		return
 	}
@@ -238,21 +245,13 @@ func (h *ModelHandler) ServeModelFile(c *gin.Context) {
 		return
 	}
 
-	if model.Status != "approved" {
+	if model.Status != "approved" || !model.IsPublic {
 		response.Forbidden(c, "model is not available for download")
 		return
 	}
 
-	filePath := model.FilePath
-	if strings.HasPrefix(filePath, "/uploads/") {
-		filePath = strings.TrimPrefix(filePath, "/uploads/")
-	}
-
-	fullPath := filepath.Join(config.AppConfig.UploadPath, filePath)
-
-	log.Printf("ServeModelFile: modelID=%s, modelFilePath=%s, fullPath=%s", id, model.FilePath, fullPath)
-
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+	fullPath, err := service.ResolveUploadPath(model.FilePath, "models")
+	if err != nil {
 		response.NotFound(c, "file not found")
 		return
 	}

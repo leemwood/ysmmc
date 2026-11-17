@@ -29,6 +29,8 @@ jobs:
         working-directory: backend
         run: |
           go mod tidy
+          go test ./...
+          go vet ./...
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ysmmc-server cmd/server/main.go
 
       - name: Upload Backend Artifact
@@ -37,6 +39,22 @@ jobs:
           name: backend-linux-amd64
           path: backend/ysmmc-server
           retention-days: 7
+
+  check-cloud-functions:
+    name: Check Cloud Functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cloud-functions/go.mod
+          cache-dependency-path: cloud-functions/go.sum
+      - name: Test Cloud Functions
+        working-directory: cloud-functions
+        run: |
+          go test ./...
+          go vet ./...
+          go build ./...
 
   build-frontend:
     name: Build Frontend
@@ -58,7 +76,10 @@ jobs:
 
       - name: Build Frontend
         working-directory: frontend
-        run: npm run build
+        run: |
+          npm test
+          npm run build
+          npm run test:sw
 
       - name: Upload Frontend Artifact
         uses: actions/upload-artifact@v4
@@ -69,7 +90,7 @@ jobs:
 
   create-release:
     name: Create Release
-    needs: [build-backend, build-frontend]
+    needs: [build-backend, build-frontend, check-cloud-functions]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -94,7 +115,7 @@ jobs:
         run: |
           mkdir -p release/migrations
           cp backend/.env.example release/.env.example
-          cp backend/migrations/001_init.sql release/migrations/
+          cp backend/migrations/*.sql release/migrations/
           cp -r backend/templates release/templates/
           cp README.md release/
 

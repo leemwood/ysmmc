@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import {
   clearNexusmcUser,
   getNexusmcUser,
+  setNexusmcUser,
   NEXUSMC_LOGIN_URL,
   type NexusmcUser,
 } from '@/lib/nexusmc'
@@ -16,6 +17,11 @@ export const useNexusmcStore = defineStore('nexusmc', () => {
   const isLoggedIn = computed(() => !!user.value)
   // 展示用用户名，未登录或无用户名时回退为中性称呼
   const displayName = computed(() => user.value?.username || 'NexusMC 用户')
+
+  function completeLogin(profile: NexusmcUser) {
+    setNexusmcUser(profile)
+    user.value = profile
+  }
 
   function login(returnTo?: string) {
     // 记住登录前的目标路径，回调完成后由 CallbackView 读取并回跳
@@ -41,5 +47,5 @@ export const useNexusmcStore = defineStore('nexusmc', () => {
     return target
   }
 
-  return { user, isLoggedIn, displayName, login, logout, consumeReturnTo }
+  return { user, isLoggedIn, displayName, completeLogin, login, logout, consumeReturnTo }
 })

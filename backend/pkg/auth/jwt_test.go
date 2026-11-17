@@ -19,12 +19,12 @@ func TestGenerateToken(t *testing.T) {
 	userID := uuid.New()
 	email := "test@example.com"
 	role := "user"
-	
+
 	tokens, err := GenerateToken(userID, email, role)
 	if err != nil {
 		t.Fatalf("failed to generate token: %v", err)
 	}
-	
+
 	if tokens.AccessToken == "" {
 		t.Error("access token should not be empty")
 	}
@@ -36,21 +36,34 @@ func TestGenerateToken(t *testing.T) {
 	}
 }
 
+func TestTokenTypesCannotBeInterchanged(t *testing.T) {
+	tokens, err := GenerateToken(uuid.New(), "test@example.com", "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseToken(tokens.RefreshToken); err == nil {
+		t.Fatal("refresh token accepted as access token")
+	}
+	if _, err := ParseRefreshToken(tokens.AccessToken); err == nil {
+		t.Fatal("access token accepted as refresh token")
+	}
+}
+
 func TestParseToken_Valid(t *testing.T) {
 	userID := uuid.New()
 	email := "test@example.com"
 	role := "admin"
-	
+
 	tokens, err := GenerateToken(userID, email, role)
 	if err != nil {
 		t.Fatalf("failed to generate token: %v", err)
 	}
-	
+
 	claims, err := ParseToken(tokens.AccessToken)
 	if err != nil {
 		t.Fatalf("failed to parse valid token: %v", err)
 	}
-	
+
 	if claims.UserID != userID {
 		t.Errorf("expected userID %s, got %s", userID, claims.UserID)
 	}
@@ -68,7 +81,7 @@ func TestParseToken_Invalid(t *testing.T) {
 		"invalid.token.format",
 		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid",
 	}
-	
+
 	for _, token := range invalidTokens {
 		_, err := ParseToken(token)
 		if err == nil {
@@ -81,17 +94,17 @@ func TestParseRefreshToken(t *testing.T) {
 	userID := uuid.New()
 	email := "test@example.com"
 	role := "user"
-	
+
 	tokens, err := GenerateToken(userID, email, role)
 	if err != nil {
 		t.Fatalf("failed to generate token: %v", err)
 	}
-	
+
 	parsedUserID, err := ParseRefreshToken(tokens.RefreshToken)
 	if err != nil {
 		t.Fatalf("failed to parse refresh token: %v", err)
 	}
-	
+
 	if parsedUserID != userID {
 		t.Errorf("expected userID %s, got %s", userID, parsedUserID)
 	}
@@ -102,7 +115,7 @@ func TestParseRefreshToken_Invalid(t *testing.T) {
 		"",
 		"invalid.refresh.token",
 	}
-	
+
 	for _, token := range invalidTokens {
 		_, err := ParseRefreshToken(token)
 		if err == nil {
@@ -115,25 +128,25 @@ func TestTokenExpiration(t *testing.T) {
 	userID := uuid.New()
 	email := "test@example.com"
 	role := "user"
-	
+
 	tokens, err := GenerateToken(userID, email, role)
 	if err != nil {
 		t.Fatalf("failed to generate token: %v", err)
 	}
-	
+
 	claims, err := ParseToken(tokens.AccessToken)
 	if err != nil {
 		t.Fatalf("failed to parse token: %v", err)
 	}
-	
+
 	now := time.Now()
 	if claims.ExpiresAt.Time.Before(now) {
 		t.Error("token should not be expired immediately after generation")
 	}
-	
+
 	expectedExpiry := now.Add(time.Duration(24) * time.Hour)
 	tolerance := time.Minute
-	
+
 	if claims.ExpiresAt.Time.Sub(expectedExpiry) > tolerance {
 		t.Errorf("token expiry time is not within expected range")
 	}

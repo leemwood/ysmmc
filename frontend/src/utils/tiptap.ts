@@ -69,9 +69,21 @@ function renderBlock(node: Node): string {
       return `<h${level}>${renderInline(node.content)}</h${level}>`
     }
     case 'bulletList':
-      return `<ul>${(node.content || []).map((li) => `<li>${renderInline(li.content)}</li>`).join('')}</ul>`
+    case 'taskList':
+      return `<ul>${renderBlockChildren(node.content)}</ul>`
     case 'orderedList':
-      return `<ol>${(node.content || []).map((li) => `<li>${renderInline(li.content)}</li>`).join('')}</ol>`
+      return `<ol>${renderBlockChildren(node.content)}</ol>`
+    case 'listItem':
+    case 'taskItem':
+      return `<li>${renderBlockChildren(node.content)}</li>`
+    case 'table':
+      return `<table><tbody>${renderBlockChildren(node.content)}</tbody></table>`
+    case 'tableRow':
+      return `<tr>${renderBlockChildren(node.content)}</tr>`
+    case 'tableHeader':
+      return `<th>${renderBlockChildren(node.content)}</th>`
+    case 'tableCell':
+      return `<td>${renderBlockChildren(node.content)}</td>`
     case 'blockquote':
       return `<blockquote>${renderBlockChildren(node.content)}</blockquote>`
     case 'codeBlock':
@@ -79,7 +91,7 @@ function renderBlock(node: Node): string {
     case 'horizontalRule':
       return '<hr>'
     default:
-      return node.content ? renderBlockChildren([node]) : renderInline([node])
+      return node.content ? renderBlockChildren(node.content) : renderInline([node])
   }
 }
 

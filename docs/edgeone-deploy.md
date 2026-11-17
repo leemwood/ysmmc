@@ -54,7 +54,7 @@ site-oauth2-provider.md）。
    `redirect_uri` 必须与登记值逐字一致。 scopes 建议 `user:basic user:email`
    加上个人主页需要的 `user:content:read user:interaction:read
    user:notification:read user:notification:write`（缺少这些权限时个人主页
-   接口会报 401，页面会引导重新授权）。
+   接口会报 403 `OAUTH_SCOPE_REQUIRED`，页面会引导重新授权）。
    默认请求的 scope 可用环境变量 `NEXUSMC_OAUTH_SCOPES` 覆盖。
 
 ## EdgeOne 环境变量

@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"log"
-	"os"
 	"regexp"
 
 	"github.com/google/uuid"
@@ -63,13 +62,17 @@ func (s *ModelVersionService) CreateVersion(modelID, userID uuid.UUID, req *Crea
 	if exists {
 		return nil, errors.New("version number already exists")
 	}
+	filePath, fileSize, err := validateModelUpload(userID, req.FilePath)
+	if err != nil {
+		return nil, err
+	}
 
 	version := &model.ModelVersion{
 		ModelID:       modelID,
 		VersionNumber: req.VersionNumber,
 		Description:   req.Description,
-		FilePath:      req.FilePath,
-		FileSize:      req.FileSize,
+		FilePath:      filePath,
+		FileSize:      fileSize,
 		ImageID:       req.ImageID,
 		ImageURL:      req.ImageURL,
 		Changelog:     req.Changelog,
@@ -86,10 +89,7 @@ func (s *ModelVersionService) CreateVersion(modelID, userID uuid.UUID, req *Crea
 		versionCount = 1
 	}
 
-	if err := s.modelRepo.Update(&model.Model{
-		ID:           modelID,
-		VersionCount: int(versionCount),
-	}); err != nil {
+	if err := s.modelRepo.UpdateVersionCount(modelID, int(versionCount)); err != nil {
 		log.Printf("Warning: failed to update model version count: %v", err)
 	}
 
@@ -196,10 +196,8 @@ func (s *ModelVersionService) DeleteVersion(modelID, versionID, userID uuid.UUID
 		return errors.New("cannot delete the current version, please set another version as current first")
 	}
 
-	if version.FilePath != "" {
-		if err := os.Remove(version.FilePath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Warning: failed to delete version file: %v", err)
-		}
+	if err := removeUpload(version.FilePath, "models"); err != nil {
+		log.Printf("Warning: skipped unsafe or unavailable version file: %v", err)
 	}
 
 	if err := s.versionRepo.Delete(versionID); err != nil {
@@ -212,10 +210,7 @@ func (s *ModelVersionService) DeleteVersion(modelID, versionID, userID uuid.UUID
 		versionCount = 1
 	}
 
-	if err := s.modelRepo.Update(&model.Model{
-		ID:           modelID,
-		VersionCount: int(versionCount),
-	}); err != nil {
+	if err := s.modelRepo.UpdateVersionCount(modelID, int(versionCount)); err != nil {
 		log.Printf("Warning: failed to update model version count: %v", err)
 	}
 

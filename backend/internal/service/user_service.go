@@ -2,12 +2,8 @@ package service
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/google/uuid"
-	"github.com/ysmmc/backend/internal/config"
 	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/repository"
 	"github.com/ysmmc/backend/pkg/auth"
@@ -210,19 +206,7 @@ func (s *UserService) Delete(userID uuid.UUID) error {
 		page++
 	}
 
-	// Delete user avatar if it's a local file
-	user, err := s.userRepo.FindByID(userID)
-	if err == nil && user.AvatarURL != nil && *user.AvatarURL != "" {
-		cfg := config.AppConfig
-		avatarURL := *user.AvatarURL
-		if strings.HasPrefix(avatarURL, "/uploads/") {
-			relPath := strings.TrimPrefix(avatarURL, "/uploads/")
-			fullPath := filepath.Join(cfg.UploadPath, relPath)
-			if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
-				// Log error
-			}
-		}
-	}
+	// 旧头像 URL 没有上传归属记录，不据客户端可编辑的 URL 删除磁盘文件。
 
 	// Delete user record (will cascade delete models, favorites, etc. in DB)
 	return s.userRepo.Delete(userID)

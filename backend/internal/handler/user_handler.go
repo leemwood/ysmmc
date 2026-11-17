@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ysmmc/backend/internal/middleware"
+	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
 )
@@ -94,7 +95,18 @@ func (h *UserHandler) GetUserModels(c *gin.Context) {
 	pageSize := 10
 
 	modelService := service.NewModelService()
-	models, total, err := modelService.ListByUserID(id, page, pageSize)
+	var models []model.Model
+	var total int64
+	requester, _ := c.Get("user_id")
+	role, _ := c.Get("role")
+	if requester == id || role == "admin" || role == "super_admin" {
+		models, total, err = modelService.ListByUserID(id, page, pageSize)
+	} else {
+		models, total, err = modelService.ListPublicByUserID(id, page, pageSize)
+		for i := range models {
+			models[i] = publicModel(models[i])
+		}
+	}
 	if err != nil {
 		response.InternalError(c, "failed to fetch models")
 		return

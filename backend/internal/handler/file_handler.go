@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/ysmmc/backend/internal/middleware"
 	"github.com/ysmmc/backend/internal/model"
 	"github.com/ysmmc/backend/internal/service"
 	"github.com/ysmmc/backend/pkg/response"
@@ -96,11 +97,11 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"id":       savedFile.ID,
-		"name":     savedFile.Name,
+		"id":        savedFile.ID,
+		"name":      savedFile.Name,
 		"mime_type": savedFile.MimeType,
-		"size":     savedFile.Size,
-		"category": savedFile.Category,
+		"size":      savedFile.Size,
+		"category":  savedFile.Category,
 	})
 }
 
@@ -112,7 +113,11 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 		return
 	}
 
-	if err := h.fileService.DeleteFile(id); err != nil {
+	if err := h.fileService.DeleteOwnedFile(id, middleware.GetUserID(c), model.IsAdmin(middleware.GetRole(c))); err != nil {
+		if errors.Is(err, service.ErrFileForbidden) {
+			response.Forbidden(c, err.Error())
+			return
+		}
 		response.NotFound(c, "file not found")
 		return
 	}

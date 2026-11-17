@@ -29,6 +29,10 @@ func (r *ModelRepository) Update(m *model.Model) error {
 	return database.DB.Model(m).Omit("User").Save(m).Error
 }
 
+func (r *ModelRepository) UpdateVersionCount(id uuid.UUID, count int) error {
+	return database.DB.Model(&model.Model{}).Where("id = ?", id).UpdateColumn("version_count", count).Error
+}
+
 func (r *ModelRepository) Delete(id uuid.UUID) error {
 	return database.DB.Delete(&model.Model{}, "id = ?", id).Error
 }
@@ -62,10 +66,21 @@ func (r *ModelRepository) ListPublic(page, pageSize int, search, sort string) ([
 }
 
 func (r *ModelRepository) ListByUserID(userID uuid.UUID, page, pageSize int) ([]model.Model, int64, error) {
+	return r.listByUserID(userID, page, pageSize, false)
+}
+
+func (r *ModelRepository) ListPublicByUserID(userID uuid.UUID, page, pageSize int) ([]model.Model, int64, error) {
+	return r.listByUserID(userID, page, pageSize, true)
+}
+
+func (r *ModelRepository) listByUserID(userID uuid.UUID, page, pageSize int, publicOnly bool) ([]model.Model, int64, error) {
 	var models []model.Model
 	var total int64
 
 	query := database.DB.Model(&model.Model{}).Where("user_id = ?", userID)
+	if publicOnly {
+		query = query.Where("status = ? AND is_public = ?", "approved", true)
+	}
 	query.Count(&total)
 
 	offset := (page - 1) * pageSize
