@@ -1,47 +1,19 @@
-import { ref, watch } from 'vue'
+import { watchEffect } from 'vue'
 import { usePreferredColorScheme, useStorage } from '@vueuse/core'
 
 export type Theme = 'light' | 'dark' | 'system'
 
-const THEME_KEY = 'ysm-theme'
-
-const storedTheme = useStorage<Theme>(THEME_KEY, 'system')
-const preferredColorScheme = usePreferredColorScheme()
-
-function applyTheme(theme: Theme) {
-  const root = document.documentElement
-  const isDark = theme === 'dark' || (theme === 'system' && preferredColorScheme.value === 'dark')
-  
-  if (isDark) {
-    root.classList.add('dark')
-  } else {
-    root.classList.remove('dark')
-  }
-}
-
 export function useTheme() {
-  const theme = ref<Theme>(storedTheme.value)
+  const theme = useStorage<Theme>('ysm-theme', 'system')
+  const preferredColorScheme = usePreferredColorScheme()
 
-  function setTheme(newTheme: Theme) {
-    theme.value = newTheme
-    storedTheme.value = newTheme
-    applyTheme(newTheme)
-  }
-
-  function toggleTheme() {
-    const currentIsDark = document.documentElement.classList.contains('dark')
-    setTheme(currentIsDark ? 'light' : 'dark')
-  }
-
-  watch(preferredColorScheme, () => {
-    if (theme.value === 'system') {
-      applyTheme('system')
-    }
+  watchEffect(() => {
+    const dark = theme.value === 'dark' || (theme.value === 'system' && preferredColorScheme.value === 'dark')
+    document.documentElement.classList.toggle('dark', dark)
   })
 
   return {
     theme,
-    setTheme,
-    toggleTheme,
+    setTheme: (value: Theme) => { theme.value = value },
   }
 }

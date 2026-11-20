@@ -1,31 +1,29 @@
 <script setup lang="ts">
-import { ImageOff } from 'lucide-vue-next'
+import { Box } from 'lucide-vue-next'
+import { ref } from 'vue'
 
-// 资源封面：有图时撑满容器（object-fit: contain，见 main.css 的
-// .resource-cover-img），无图时渲染统一的占位提示。外层定高容器由调用方提供。
-withDefaults(
-  defineProps<{
-    cover: string
-    title: string
-    imgClass?: string
-    iconClass?: string
-  }>(),
-  { imgClass: '', iconClass: 'h-10 w-10' },
-)
+withDefaults(defineProps<{
+  cover: string
+  title: string
+  iconClass?: string
+  eager?: boolean
+}>(), { iconClass: 'size-9' })
+
+const failedSrc = ref('')
 </script>
 
 <template>
   <img
-    v-if="cover"
+    v-if="cover && cover !== failedSrc"
+    :key="cover"
     :src="cover"
     :alt="title"
-    loading="lazy"
+    :loading="eager ? 'eager' : 'lazy'"
     decoding="async"
     class="resource-cover-img"
-    :class="imgClass"
+    @error="failedSrc = cover"
   />
-  <div v-else class="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-    <ImageOff :class="iconClass" class="opacity-50" />
-    <span class="text-sm">无预览图</span>
+  <div v-else class="grid h-full place-items-center text-muted-foreground" role="img" aria-label="无预览图">
+    <Box :class="iconClass" class="opacity-60" aria-hidden="true" />
   </div>
 </template>

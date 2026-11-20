@@ -1,27 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Skeleton } from '@/components/ui/skeleton'
+import { ArrowUpRight, Bell, CheckCheck, CircleAlert, Heart, LogIn, LogOut, Package, UserRound } from 'lucide-vue-next'
+import type { AxiosResponse } from 'axios'
 import NexusmcAvatar from '@/components/NexusmcAvatar.vue'
 import ResourceCover from '@/components/ResourceCover.vue'
-import {
-  Bell,
-  CheckCheck,
-  ChevronLeft,
-  ChevronRight,
-  ExternalLink,
-  Heart,
-  LogOut,
-  Package,
-  Sparkles,
-} from 'lucide-vue-next'
+import ResourcePagination from '@/components/ResourcePagination.vue'
 import {
   isNexusmcAuthError,
   isNexusmcConfigError,
+  NEXUSMC_REGISTER_URL,
+  NEXUSMC_SITE,
   nexusmcMeApi,
   resourceCover,
   resourcePageUrl,
@@ -31,381 +19,355 @@ import {
   type NexusmcResource,
 } from '@/lib/nexusmc'
 import { useNexusmcStore } from '@/stores/nexusmc'
-import type { AxiosResponse } from 'axios'
 
 type LooseItem = Record<string, unknown>
 type MeTab = 'content' | 'favorites' | 'notifications'
 
 const PAGE_SIZE = 20
+const tabs = [
+  { key: 'content', label: '我的投稿', icon: Package, empty: '当前没有符合条件的投稿。' },
+  { key: 'favorites', label: '我的收藏', icon: Heart, empty: '还没有收藏过模型。' },
+  { key: 'notifications', label: '通知', icon: Bell, empty: '暂无通知。' },
+] as const
+
+const statusLabels: Record<string, string> = {
+  approved: '已通过',
+  pending: '审核中',
+  rejected: '未通过',
+}
 
 const store = useNexusmcStore()
 const activeTab = ref<MeTab>('content')
 const contentStatus = ref('all')
 const unread = ref(0)
+const markingRead = ref(false)
+const readError = ref('')
+let unreadRequest = 0
 
-// --- 宽松字段工具：me/* 各端点条目结构未在文档中完整定义 ---------------
-
-function asRecord(v: unknown): LooseItem | null {
-  return v && typeof v === 'object' && !Array.isArray(v) ? (v as LooseItem) : null
+function asRecord(value: unknown): LooseItem | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as LooseItem : null
 }
 
-// 投稿/收藏条目可能是裸资源，也可能包一层 { resource: ... } / { item: ... }
 function unwrapResource(item: LooseItem): NexusmcResource {
-  return (asRecord(item.resource) ?? asRecord(item.item) ?? item) as NexusmcResource
+  return asRecord(item.resource) ?? asRecord(item.item) ?? item
 }
 
-function looseString(obj: LooseItem, keys: string[]): string {
-  for (const k of keys) {
-    const v = obj[k]
-    if (typeof v === 'string' && v) return v
+function looseString(item: LooseItem, keys: string[]): string {
+  for (const key of keys) {
+    const value = item[key]
+    if (typeof value === 'string' && value) return value
   }
   return ''
 }
 
 function looseId(item: LooseItem): string {
-  return looseString(item, ['id', 'slug', 'nid'])
-}
-
-const STATUS_LABELS: Record<string, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> = {
-  approved: { label: '已通过', variant: 'secondary' },
-  pending: { label: '审核中', variant: 'outline' },
-  rejected: { label: '未通过', variant: 'destructive' },
-}
-function contentStatusOf(item: LooseItem) {
-  return STATUS_LABELS[looseString(item, ['status'])] ?? STATUS_LABELS.approved
+  return looseString(item, ['id', 'slug', 'nid']) || (typeof item.id === 'number' ? String(item.id) : '')
 }
 
 function formatDate(raw: string): string {
-  if (!raw) return ''
   const date = new Date(raw)
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('zh-CN')
 }
 
-function notificationTitle(n: LooseItem): string {
-  return looseString(n, ['title', 'subject']) || '通知'
+function isUnread(item: LooseItem): boolean {
+  return !(item.isRead ?? item.read ?? item.readAt ?? item.read_at)
 }
-
-function notificationBody(n: LooseItem): string {
-  return looseString(n, ['content', 'message', 'body', 'excerpt'])
-}
-
-function notificationTime(n: LooseItem): string {
-  return formatDate(looseString(n, ['createdAt', 'created_at', 'time']))
-}
-
-function isUnread(n: LooseItem): boolean {
-  return !(n.isRead ?? n.read ?? n.readAt ?? n.read_at)
-}
-
-// --- 三个列表共享的分页加载逻辑 -----------------------------------------
 
 function createListState(loader: (page: number, pageSize: number) => Promise<AxiosResponse<NexusmcMeListResponse>>) {
   const items = ref<LooseItem[]>([])
   const loading = ref(false)
   const error = ref('')
+  const authError = ref(false)
   const page = ref(1)
   const totalPages = ref(1)
   const loaded = ref(false)
+  let requestId = 0
 
   async function fetchList(targetPage = 1) {
+    const currentRequest = ++requestId
     loading.value = true
     error.value = ''
+    authError.value = false
+    page.value = targetPage
+
     try {
       const { data } = await loader(targetPage, PAGE_SIZE)
+      if (currentRequest !== requestId) return
       items.value = data.items ?? []
       totalPages.value = Math.max(data.pagination?.totalPages ?? 1, 1)
-      page.value = targetPage
       loaded.value = true
-    } catch (e) {
-      if (isNexusmcConfigError(e)) {
-        error.value = 'NexusMC 服务暂不可用，请稍后重试或联系站点管理员。'
-      } else if (isNexusmcAuthError(e)) {
-        error.value = '登录已过期，或授权未包含个人数据权限，请重新登录。'
+    } catch (cause) {
+      if (currentRequest !== requestId) return
+      authError.value = isNexusmcAuthError(cause)
+      if (isNexusmcConfigError(cause)) {
+        error.value = 'NexusMC 服务暂不可用，请稍后重试。'
+      } else if (authError.value) {
+        error.value = '登录已过期，或当前授权缺少个人数据权限。'
       } else {
-        error.value = '加载失败，请稍后重试。'
+        error.value = '列表加载失败，请稍后重试。'
       }
       items.value = []
+      loaded.value = false
     } finally {
-      loading.value = false
+      if (currentRequest === requestId) loading.value = false
     }
   }
 
-  return { items, loading, error, page, totalPages, loaded, fetchList }
+  return { items, loading, error, authError, page, totalPages, loaded, fetchList }
 }
 
-const contentState = createListState((p, ps) =>
+const contentState = createListState((page, pageSize) =>
   nexusmcMeApi.content({
     type: 'resource',
     status: contentStatus.value === 'all' ? undefined : contentStatus.value,
-    page: p,
-    pageSize: ps,
+    page,
+    pageSize,
   }),
 )
-const favoritesState = createListState((p, ps) => nexusmcMeApi.favorites({ page: p, pageSize: ps }))
-const notificationsState = createListState((p, ps) => nexusmcMeApi.notifications({ page: p, pageSize: ps }))
-
-const states = reactive<Record<MeTab, ReturnType<typeof createListState>>>({
-  content: contentState,
-  favorites: favoritesState,
-  notifications: notificationsState,
-})
-
+const favoritesState = createListState((page, pageSize) => nexusmcMeApi.favorites({ page, pageSize }))
+const notificationsState = createListState((page, pageSize) => nexusmcMeApi.notifications({ page, pageSize }))
+const states = reactive({ content: contentState, favorites: favoritesState, notifications: notificationsState })
 const activeState = computed(() => states[activeTab.value])
+const selectedTab = computed(() => tabs.find(tab => tab.key === activeTab.value) ?? tabs[0])
+
+const resources = computed(() => activeState.value.items.map((item) => {
+  const resource = unwrapResource(item)
+  const status = looseString(item, ['status']) || looseString(resource, ['status'])
+  return {
+    id: looseId(item) || looseId(resource),
+    title: resourceTitle(resource),
+    cover: resourceCover(resource),
+    updatedAt: formatDate(resourceUpdatedAt(resource)),
+    url: resourcePageUrl(resource),
+    status: statusLabels[status] ?? '',
+  }
+}))
 
 function switchTab(tab: MeTab) {
   activeTab.value = tab
   const state = states[tab]
-  if (!state.loaded) void state.fetchList(1)
-}
-
-function goPage(delta: number) {
-  const state = activeState.value
-  const next = state.page + delta
-  if (next < 1 || next > state.totalPages) return
-  void state.fetchList(next)
-}
-
-function changeStatus() {
-  void contentState.fetchList(1)
+  if (!state.loaded && !state.loading) void state.fetchList(state.page)
 }
 
 async function refreshUnread() {
+  const currentRequest = ++unreadRequest
   try {
     const { data } = await nexusmcMeApi.unreadCount()
-    unread.value = typeof data.count === 'number' ? data.count : 0
+    if (currentRequest === unreadRequest) unread.value = typeof data.count === 'number' ? data.count : 0
   } catch {
-    unread.value = 0
+    // 保留最近一次已知的未读数。
   }
 }
 
-async function readAllNotifications() {
+async function readNotification(item?: LooseItem) {
+  if (markingRead.value || (item && !isUnread(item))) return
+  const id = item ? looseId(item) : ''
+  markingRead.value = true
+  readError.value = ''
   try {
-    await nexusmcMeApi.markAllRead()
-    unread.value = 0
-    for (const n of notificationsState.items.value) {
-      n.isRead = true
+    if (!item) {
+      await nexusmcMeApi.markAllRead()
+      for (const notification of notificationsState.items.value) notification.isRead = true
+      unread.value = 0
+    } else {
+      if (id) await nexusmcMeApi.markRead(id)
+      item.isRead = true
+      unread.value = Math.max(unread.value - 1, 0)
     }
+    ++unreadRequest
+    if (!item || id) void refreshUnread()
   } catch {
-    // 静默失败，下次刷新时恢复
-  }
-}
-
-async function readNotification(n: LooseItem) {
-  if (!isUnread(n)) return
-  const id = looseId(n)
-  if (!id) {
-    n.isRead = true
-    unread.value = Math.max(unread.value - 1, 0)
-    return
-  }
-  try {
-    await nexusmcMeApi.markRead(id)
-    n.isRead = true
-    unread.value = Math.max(unread.value - 1, 0)
-  } catch {
-    // 保持未读，不打扰用户
+    readError.value = '标记已读失败，请重试。'
+  } finally {
+    markingRead.value = false
   }
 }
 
 onMounted(() => {
   if (!store.isLoggedIn) return
-  void contentState.fetchList(1)
+  void contentState.fetchList()
   void refreshUnread()
 })
 </script>
 
 <template>
-  <div class="container-app py-6 sm:py-8">
-    <!-- 未登录：引导登录（登录后自动回本页） -->
-    <Card v-if="!store.isLoggedIn" class="mx-auto mt-10 w-full max-w-md">
-      <CardContent class="flex flex-col items-center gap-4 p-8 text-center">
-        <p class="font-semibold">登录后查看个人主页</p>
-        <p class="text-sm text-muted-foreground">
-          个人主页展示你在 NexusMC 的投稿、收藏与通知。首次登录需在 NexusMC 授权页
-          同意「个人数据读取」权限。
-        </p>
-        <Button class="btn-press focus-ring" @click="store.login('/me')">
-          <Sparkles class="mr-1.5 h-4 w-4" />
-          通过 NexusMC 登录
-        </Button>
-        <RouterLink to="/" class="text-sm text-primary hover:underline">返回资源首页</RouterLink>
-      </CardContent>
-    </Card>
+  <div class="container-app py-7 sm:py-11">
+    <section v-if="!store.isLoggedIn" class="site-panel mx-auto my-6 max-w-lg p-6 text-center sm:my-10 sm:p-10">
+      <div class="status-icon mx-auto"><UserRound class="size-6" aria-hidden="true" /></div>
+      <h1 class="mt-4 text-2xl font-bold">登录后查看个人主页</h1>
+      <p class="mt-2 text-sm text-muted-foreground">使用 NexusMC 账号查看你的投稿、收藏和通知。在授权时开启「个人数据读取」权限即可访问。</p>
+      <div class="mt-6 flex flex-wrap justify-center gap-2">
+        <button type="button" class="site-button site-button-primary" @click="store.login('/me')">
+          <LogIn class="size-4" aria-hidden="true" /> 通过 NexusMC 登录
+        </button>
+        <a :href="NEXUSMC_REGISTER_URL" target="_blank" rel="noopener noreferrer" class="site-button site-button-outline">
+          注册账号 <ArrowUpRight class="size-4" aria-hidden="true" />
+        </a>
+      </div>
+      <RouterLink to="/" class="mt-5 inline-block rounded-sm text-sm font-semibold text-primary hover:underline">返回模型库</RouterLink>
+    </section>
 
     <template v-else>
-      <!-- 资料卡 -->
-      <section class="flex items-center gap-4 rounded-2xl border bg-background/80 p-5 sm:p-6">
-        <NexusmcAvatar size="lg" class="border" />
-        <div class="min-w-0 flex-1">
-          <h1 class="truncate text-xl font-bold tracking-tight">{{ store.displayName }}</h1>
-          <p class="truncate text-sm text-muted-foreground">
-            {{ store.user?.email || `NexusMC UID ${store.user?.uid ?? '—'}` }}
-          </p>
-        </div>
-        <Button variant="ghost" size="icon" class="btn-press focus-ring shrink-0" aria-label="退出登录" @click="store.logout()">
-          <LogOut class="h-4 w-4" />
-        </Button>
-      </section>
-
-      <!-- 标签页 -->
-      <div class="mt-6 flex items-center gap-1 border-b">
-        <button
-          v-for="tab in [
-            { key: 'content', label: '我的投稿', icon: Package },
-            { key: 'favorites', label: '我的收藏', icon: Heart },
-            { key: 'notifications', label: '通知', icon: Bell },
-          ] as const"
-          :key="tab.key"
-          class="relative inline-flex items-center gap-1.5 rounded-t-md px-3 py-2 text-sm font-medium transition-colors focus-ring"
-          :class="activeTab === tab.key ? 'text-primary border-b-2 border-primary -mb-px' : 'text-muted-foreground hover:text-foreground'"
-          @click="switchTab(tab.key)"
-        >
-          <component :is="tab.icon" class="h-4 w-4" />
-          {{ tab.label }}
-          <span
-            v-if="tab.key === 'notifications' && unread > 0"
-            class="ml-0.5 rounded-full bg-destructive px-1.5 text-xs font-medium text-destructive-foreground"
-          >
-            {{ unread }}
-          </span>
-        </button>
-      </div>
-
-      <!-- 投稿状态筛选 -->
-      <div v-if="activeTab === 'content'" class="mt-4 flex items-center gap-2">
-        <select
-          v-model="contentStatus"
-          class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-ring"
-          @change="changeStatus"
-        >
-          <option value="all">全部状态</option>
-          <option value="approved">已通过</option>
-          <option value="pending">审核中</option>
-          <option value="rejected">未通过</option>
-        </select>
-      </div>
-
-      <!-- 通知：全部已读 -->
-      <div v-if="activeTab === 'notifications' && unread > 0" class="mt-4 flex justify-end">
-        <Button variant="outline" size="sm" class="btn-press focus-ring" @click="readAllNotifications">
-          <CheckCheck class="mr-1.5 h-4 w-4" />
-          全部标为已读
-        </Button>
-      </div>
-
-      <!-- 错误提示 -->
-      <Alert v-if="activeState.error" class="mt-4" :variant="activeState.error.includes('登录') ? 'default' : 'destructive'">
-        <AlertDescription class="flex flex-wrap items-center gap-3">
-          <span>{{ activeState.error }}</span>
-          <Button v-if="activeState.error.includes('登录')" size="sm" variant="outline" class="btn-press focus-ring" @click="store.login('/me')">
-            重新登录
-          </Button>
-        </AlertDescription>
-      </Alert>
-
-      <!-- 加载骨架 -->
-      <div v-if="activeState.loading" class="mt-4 space-y-3">
-        <Skeleton v-for="i in 4" :key="i" class="h-20 rounded-xl" />
-      </div>
-
-      <!-- 投稿 / 收藏列表 -->
-      <template v-else-if="activeTab !== 'notifications' && activeState.items.length">
-        <div class="mt-4 space-y-3">
-          <Card v-for="item in activeState.items" :key="looseId(item) || resourceTitle(unwrapResource(item))" class="card-hover">
-            <CardContent class="flex items-center gap-4 p-3 sm:p-4">
-              <div class="hidden h-16 w-24 shrink-0 overflow-hidden rounded-md bg-muted sm:block">
-                <ResourceCover
-                  :cover="resourceCover(unwrapResource(item))"
-                  :title="resourceTitle(unwrapResource(item))"
-                  icon-class="h-6 w-6"
-                />
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="truncate font-medium">{{ resourceTitle(unwrapResource(item)) }}</span>
-                  <Badge v-if="activeTab === 'content'" :variant="contentStatusOf(item).variant" class="text-xs">
-                    {{ contentStatusOf(item).label }}
-                  </Badge>
-                </div>
-                <p class="mt-1 text-xs text-muted-foreground">
-                  <template v-if="formatDate(resourceUpdatedAt(unwrapResource(item)))">
-                    更新于 {{ formatDate(resourceUpdatedAt(unwrapResource(item))) }}
-                  </template>
-                  <template v-else>更新日期待定</template>
-                </p>
-              </div>
-              <a
-                v-if="resourcePageUrl(unwrapResource(item))"
-                :href="resourcePageUrl(unwrapResource(item))"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button variant="outline" size="sm" class="btn-press focus-ring shrink-0">
-                  <ExternalLink class="mr-1.5 h-3.5 w-3.5" />
-                  NexusMC
-                </Button>
-              </a>
-            </CardContent>
-          </Card>
-        </div>
-      </template>
-
-      <!-- 通知列表 -->
-      <template v-else-if="activeTab === 'notifications' && activeState.items.length">
-        <div class="mt-4 space-y-2">
-          <button
-            v-for="n in activeState.items"
-            :key="looseId(n) || notificationTitle(n)"
-            class="w-full rounded-xl border p-4 text-left transition-colors hover:bg-accent/50 focus-ring"
-            :class="isUnread(n) ? 'bg-background' : 'opacity-70'"
-            @click="readNotification(n)"
-          >
-            <div class="flex items-start gap-3">
-              <span v-if="isUnread(n)" class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-              <span v-else class="mt-1.5 h-2 w-2 shrink-0" />
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium" :class="{ 'font-semibold': isUnread(n) }">{{ notificationTitle(n) }}</p>
-                <p v-if="notificationBody(n)" class="mt-1 text-sm text-muted-foreground line-clamp-2">
-                  {{ notificationBody(n) }}
-                </p>
-                <p v-if="notificationTime(n)" class="mt-1 text-xs text-muted-foreground/70">{{ notificationTime(n) }}</p>
-              </div>
+      <h1 class="mb-5 font-display text-[clamp(1.875rem,4vw,2.75rem)] font-bold tracking-tight">个人主页</h1>
+      <div class="account-layout">
+        <aside class="site-panel overflow-hidden">
+          <div class="flex items-center gap-3 px-4 py-4 sm:px-5">
+            <NexusmcAvatar size="lg" class="shrink-0" />
+            <div class="min-w-0 flex-1">
+              <p class="truncate font-bold">{{ store.displayName }}</p>
+              <p v-if="store.user?.email || store.user?.uid != null" class="truncate text-xs text-muted-foreground">
+                {{ store.user?.email || `NexusMC UID ${store.user?.uid}` }}
+              </p>
             </div>
-          </button>
-        </div>
-      </template>
+            <button type="button" class="site-button site-button-ghost site-button-icon shrink-0" aria-label="退出登录" @click="store.logout()">
+              <LogOut class="size-4 text-muted-foreground" aria-hidden="true" />
+            </button>
+          </div>
 
-      <!-- 空状态 -->
-      <div v-else-if="!activeState.error" class="mt-12 text-center">
-        <p class="text-muted-foreground">
-          {{ activeTab === 'content' ? '还没有投稿过模型。' : activeTab === 'favorites' ? '还没有收藏过资源。' : '暂无通知。' }}
-        </p>
-        <p v-if="activeTab === 'content'" class="mt-2 text-sm text-muted-foreground/70">
-          投稿与更新都在 NexusMC 进行，审核通过后会出现在这里。
-        </p>
-      </div>
+          <nav class="account-nav border-t border-border p-2" aria-label="个人主页导航">
+            <button
+              v-for="tab in tabs"
+              :key="tab.key"
+              type="button"
+              :aria-current="activeTab === tab.key ? 'true' : undefined"
+              class="site-button site-button-ghost min-w-0 justify-start px-2 sm:px-3"
+              :class="activeTab === tab.key ? 'bg-accent text-primary' : 'text-muted-foreground'"
+              @click="switchTab(tab.key)"
+            >
+              <component :is="tab.icon" class="size-4 shrink-0" aria-hidden="true" />
+              {{ tab.label }}
+              <span
+                v-if="tab.key === 'notifications' && unread > 0"
+                class="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs text-primary-foreground"
+                :aria-label="`${unread} 条未读`"
+              >{{ unread }}</span>
+            </button>
+          </nav>
+        </aside>
 
-      <!-- 分页 -->
-      <div
-        v-if="!activeState.loading && activeState.items.length && activeState.totalPages > 1"
-        class="mt-6 flex items-center justify-center gap-4"
-      >
-        <Button variant="outline" size="sm" class="btn-press focus-ring" :disabled="activeState.page <= 1" @click="goPage(-1)">
-          <ChevronLeft class="mr-1 h-4 w-4" />
-          上一页
-        </Button>
-        <span class="text-sm text-muted-foreground">第 {{ activeState.page }} / {{ activeState.totalPages }} 页</span>
-        <Button
-          variant="outline"
-          size="sm"
-          class="btn-press focus-ring"
-          :disabled="activeState.page >= activeState.totalPages"
-          @click="goPage(1)"
-        >
-          下一页
-          <ChevronRight class="ml-1 h-4 w-4" />
-        </Button>
+        <section class="min-w-0" aria-labelledby="me-list-title" :aria-busy="activeState.loading">
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 id="me-list-title" class="text-xl font-bold">{{ selectedTab.label }}</h2>
+            <select
+              v-if="activeTab === 'content'"
+              v-model="contentStatus"
+              class="site-select"
+              aria-label="投稿状态"
+              @change="contentState.fetchList()"
+            >
+              <option value="all">全部状态</option>
+              <option v-for="(label, value) in statusLabels" :key="value" :value="value">{{ label }}</option>
+            </select>
+            <button
+              v-if="activeTab === 'notifications' && unread > 0"
+              type="button"
+              class="site-button site-button-outline"
+              :disabled="markingRead || activeState.loading"
+              @click="readNotification()"
+            ><CheckCheck class="size-4" aria-hidden="true" /> 全部标为已读</button>
+          </div>
+
+          <p v-if="activeTab === 'notifications' && readError" role="alert" class="mb-3 text-sm text-destructive">{{ readError }}</p>
+
+          <div v-if="activeState.loading" class="grid gap-3" role="status">
+            <span class="sr-only">正在加载{{ selectedTab.label }}…</span>
+            <div v-for="i in 3" :key="i" class="h-20 animate-pulse rounded-xl bg-muted" aria-hidden="true" />
+          </div>
+
+          <div v-else-if="activeState.error" class="site-panel flex flex-wrap items-center gap-3 p-4 sm:p-5" role="alert">
+            <div class="status-icon"><CircleAlert class="size-5" aria-hidden="true" /></div>
+            <p class="min-w-44 flex-1 text-sm text-muted-foreground">{{ activeState.error }}</p>
+            <button v-if="activeState.authError" type="button" class="site-button site-button-outline" @click="store.login('/me')">重新登录</button>
+            <button v-else type="button" class="site-button site-button-outline" @click="activeState.fetchList(activeState.page)">重试</button>
+          </div>
+
+          <ul v-else-if="activeTab === 'notifications' && activeState.items.length" class="grid gap-2">
+            <li v-for="(item, index) in activeState.items" :key="looseId(item) || index">
+              <article class="site-panel flex flex-wrap items-start gap-3 p-4">
+                <span
+                  class="mt-2 size-2 shrink-0 rounded-full"
+                  :class="isUnread(item) ? 'bg-primary' : 'bg-muted'"
+                  :aria-label="isUnread(item) ? '未读' : '已读'"
+                />
+                <div class="min-w-36 flex-1 wrap-anywhere">
+                  <h3 class="text-sm font-bold">{{ looseString(item, ['title', 'subject']) || '通知' }}</h3>
+                  <p class="mt-1 whitespace-pre-line text-sm text-muted-foreground">{{ looseString(item, ['content', 'message', 'body', 'excerpt']) }}</p>
+                  <p class="mt-1 text-xs text-muted-foreground">{{ formatDate(looseString(item, ['createdAt', 'created_at', 'time'])) }}</p>
+                </div>
+                <button
+                  v-if="isUnread(item)"
+                  type="button"
+                  class="site-button site-button-ghost text-primary"
+                  :disabled="markingRead"
+                  @click="readNotification(item)"
+                >标为已读</button>
+              </article>
+            </li>
+          </ul>
+
+          <ul v-else-if="resources.length" class="grid gap-2">
+            <li v-for="(resource, index) in resources" :key="resource.id || index" class="site-panel flex flex-wrap items-center gap-3 p-3 sm:p-4">
+              <div class="hidden h-16 w-24 shrink-0 overflow-hidden rounded-md bg-muted sm:block">
+                <ResourceCover :cover="resource.cover" :title="resource.title" icon-class="size-5" />
+              </div>
+              <div class="min-w-28 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="font-bold">{{ resource.title }}</h3>
+                  <span
+                    v-if="activeTab === 'content' && resource.status"
+                    class="rounded-md bg-accent px-2 py-0.5 text-xs font-medium text-primary"
+                  >{{ resource.status }}</span>
+                </div>
+                <p v-if="resource.updatedAt" class="mt-1 text-xs text-muted-foreground">更新于 {{ resource.updatedAt }}</p>
+              </div>
+              <a v-if="resource.url" :href="resource.url" target="_blank" rel="noopener noreferrer" class="site-button site-button-outline">
+                NexusMC <ArrowUpRight class="size-4" aria-hidden="true" />
+              </a>
+            </li>
+          </ul>
+
+          <div v-else class="site-panel grid justify-items-center gap-3 p-6 text-center sm:p-10">
+            <div class="status-icon"><component :is="selectedTab.icon" class="size-5" aria-hidden="true" /></div>
+            <p class="text-sm text-muted-foreground">{{ selectedTab.empty }}</p>
+            <a v-if="activeTab === 'content'" :href="NEXUSMC_SITE + '/resources/new'" target="_blank" rel="noopener noreferrer" class="site-button site-button-outline">
+              前往投稿 <ArrowUpRight class="size-4" aria-hidden="true" />
+            </a>
+            <RouterLink v-else-if="activeTab === 'favorites'" to="/" class="site-button site-button-outline">浏览模型库</RouterLink>
+          </div>
+
+          <ResourcePagination
+            v-if="!activeState.loading && !activeState.error"
+            :page="activeState.page"
+            :total-pages="activeState.totalPages"
+            @change="activeState.fetchList($event)"
+          />
+        </section>
       </div>
     </template>
   </div>
 </template>
+
+<style scoped>
+.account-layout {
+  display: grid;
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.account-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem;
+}
+
+@media (min-width: 800px) {
+  .account-layout {
+    grid-template-columns: minmax(15rem, 1fr) minmax(0, 3fr);
+    gap: 1.5rem;
+  }
+
+  .account-nav {
+    display: grid;
+  }
+}
+</style>

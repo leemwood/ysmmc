@@ -166,7 +166,14 @@ export function resourceCover(item: NexusmcResource): string {
 }
 
 export function resourcePageUrl(item: NexusmcResource): string {
-  return item.page_url || pickString(item, ['page_url', 'url']) || ''
+  const raw = pickString(item, ['page_url', 'url']).trim()
+  if (!raw) return ''
+  try {
+    const url = new URL(raw, NEXUSMC_SITE)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : ''
+  } catch {
+    return ''
+  }
 }
 
 export function resourceDownloads(item: NexusmcResource): number | undefined {

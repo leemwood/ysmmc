@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { CircleAlert, LoaderCircle } from 'lucide-vue-next'
 import { type NexusmcUser } from '@/lib/nexusmc'
 import { useNexusmcStore } from '@/stores/nexusmc'
 
@@ -43,20 +42,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="container-app flex min-h-[60vh] items-center justify-center py-10">
-    <Card class="w-full max-w-md">
-      <CardContent class="flex flex-col items-center gap-4 p-8 text-center">
-        <template v-if="error">
-          <p class="font-semibold text-destructive">登录未完成</p>
-          <p class="text-sm text-muted-foreground">{{ error }}</p>
-          <Button size="sm" class="btn-press focus-ring" @click="router.replace('/')">
-            返回资源首页
-          </Button>
-        </template>
-        <template v-else>
-          <p class="text-sm text-muted-foreground">正在完成 NexusMC 登录…</p>
-        </template>
-      </CardContent>
-    </Card>
+  <div class="container-app flex min-h-[58vh] items-center justify-center py-8">
+    <section class="site-panel w-full max-w-md p-6 text-center sm:p-9" :role="error ? 'alert' : 'status'">
+      <div class="status-icon mx-auto">
+        <CircleAlert v-if="error" class="size-6" aria-hidden="true" />
+        <LoaderCircle v-else class="size-6 animate-spin" aria-hidden="true" />
+      </div>
+      <h1 class="mt-4 text-xl font-bold">{{ error ? '登录未完成' : '正在完成 NexusMC 登录…' }}</h1>
+      <template v-if="error">
+        <p class="mt-2 text-sm text-muted-foreground">{{ error }}</p>
+        <button type="button" class="site-button site-button-primary mt-5" @click="router.replace('/')">返回模型库</button>
+      </template>
+    </section>
   </div>
 </template>

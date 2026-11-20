@@ -1,22 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Skeleton } from '@/components/ui/skeleton'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowRight, ArrowUpRight, Box, CircleAlert, Download, Eye, RefreshCw, Search, Upload, X } from 'lucide-vue-next'
+import HeroArtwork from '@/components/HeroArtwork.vue'
 import ResourceCover from '@/components/ResourceCover.vue'
-import {
-  Download,
-  Eye,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-vue-next'
+import ResourcePagination from '@/components/ResourcePagination.vue'
 import {
   isNexusmcConfigError,
-  NEXUSMC_REGISTER_URL,
   NEXUSMC_SITE,
   nexusmcApi,
   normalizeCatalogOptions,
@@ -24,269 +14,381 @@ import {
   resourceDescription,
   resourceDetailPath,
   resourceDownloads,
+  resourcePageUrl,
   resourceTags,
   resourceTitle,
   resourceViews,
   type CatalogOption,
-  type NexusmcListResponse,
   type NexusmcResource,
 } from '@/lib/nexusmc'
 
 const PAGE_SIZE = 20
-
+const MAX_QUERY_LENGTH = 100
+const numberFormat = new Intl.NumberFormat('zh-CN')
 const route = useRoute()
 const router = useRouter()
-const loading = ref(false)
-const error = ref('')
-const serviceUnavailable = ref(false)
+const searchField = ref<HTMLInputElement>()
+const resultsSection = ref<HTMLElement>()
+const keyword = computed(() => typeof route.query.q === 'string' ? route.query.q.trim().slice(0, MAX_QUERY_LENGTH) : '')
+const category = computed(() => typeof route.query.category === 'string' ? route.query.category : '')
+const page = computed(() => {
+  const value = typeof route.query.page === 'string' ? Number(route.query.page) : 1
+  return Number.isSafeInteger(value) && value > 0 ? value : 1
+})
+const searchInput = ref(keyword.value)
+const loading = ref(true)
+const error = ref<'offline' | 'load' | ''>('')
 const items = ref<NexusmcResource[]>([])
 const total = ref(0)
 const totalPages = ref(1)
-const page = ref(1)
-// 搜索关键词与顶栏搜索框通过路由 ?q= 双向同步
-const keyword = ref(String(route.query.q || '').trim())
 const categories = ref<CatalogOption[]>([])
-const activeCategory = ref('')
+let requestId = 0
 
-const totalPagesSafe = computed(() => Math.max(totalPages.value, 1))
-
-// 顶栏提交搜索 / 清除搜索后路由变化，这里跟随重新加载
-watch(() => route.query.q, (q) => {
-  const next = String(q || '').trim()
-  if (next === keyword.value) return
-  keyword.value = next
-  page.value = 1
-  fetchResources()
-})
+const cards = computed(() => items.value.map((item) => {
+  const downloads = resourceDownloads(item)
+  const views = resourceViews(item)
+  return {
+    title: resourceTitle(item),
+    cover: resourceCover(item),
+    description: resourceDescription(item),
+    tags: [...new Set(resourceTags(item))],
+    path: resourceDetailPath(item),
+    externalUrl: resourcePageUrl(item),
+    downloads: downloads === undefined ? '' : numberFormat.format(downloads),
+    views: views === undefined ? '' : numberFormat.format(views),
+  }
+}))
 
 async function fetchCatalog() {
   try {
     const { data } = await nexusmcApi.catalog()
     categories.value = normalizeCatalogOptions(data)
   } catch {
-    categories.value = []
+    // 已加载的分类仍可用于筛选。
   }
 }
 
 async function fetchResources() {
+  const currentRequest = ++requestId
   loading.value = true
   error.value = ''
-  serviceUnavailable.value = false
   try {
-    let data: NexusmcListResponse
-    if (keyword.value) {
-      data = (
-        await nexusmcApi.search(keyword.value, { page: page.value, pageSize: PAGE_SIZE, category: activeCategory.value || undefined })
-      ).data
-    } else {
-      data = (
-        await nexusmcApi.resources({
-          page: page.value,
-          pageSize: PAGE_SIZE,
-          category: activeCategory.value || undefined,
-        })
-      ).data
+    const params = { page: page.value, pageSize: PAGE_SIZE, category: category.value || undefined }
+    const { data } = await (keyword.value ? nexusmcApi.search(keyword.value, params) : nexusmcApi.resources(params))
+    if (currentRequest !== requestId) return
+
+    const lastPage = Math.max(data.pagination?.totalPages ?? 1, 1)
+    if (page.value > lastPage) {
+      await router.replace({ query: { ...route.query, page: lastPage > 1 ? String(lastPage) : undefined } })
+      return
     }
-    items.value = data.items || []
+    items.value = data.items ?? []
     total.value = data.pagination?.total ?? items.value.length
-    totalPages.value = data.pagination?.totalPages ?? 1
-  } catch (e) {
-    if (isNexusmcConfigError(e)) {
-      serviceUnavailable.value = true
-    } else {
-      error.value = '获取 NexusMC 资源失败，请稍后重试。'
-    }
+    totalPages.value = lastPage
+  } catch (cause) {
+    if (currentRequest !== requestId) return
+    error.value = isNexusmcConfigError(cause) ? 'offline' : 'load'
     items.value = []
+    total.value = 0
+    totalPages.value = 1
   } finally {
-    loading.value = false
+    if (currentRequest === requestId) loading.value = false
   }
 }
 
-function clearSearch() {
-  keyword.value = ''
-  page.value = 1
-  // 同步清掉路由上的 q（watcher 会因值相同而跳过，不会重复请求）
-  if (route.query.q !== undefined) void router.replace({ query: {} })
-  fetchResources()
+async function updateQuery(q: string, nextCategory: string, nextPage = 1, scroll = false) {
+  await router.push({
+    path: '/',
+    query: {
+      ...route.query,
+      q: q || undefined,
+      category: nextCategory || undefined,
+      page: nextPage > 1 ? String(nextPage) : undefined,
+    },
+  })
+  if (scroll) resultsSection.value?.scrollIntoView({ block: 'start' })
 }
 
-function changeCategory() {
-  page.value = 1
-  fetchResources()
+function submitSearch() {
+  const q = searchInput.value.trim().slice(0, MAX_QUERY_LENGTH)
+  searchInput.value = q
+  void updateQuery(q, category.value, 1, true)
 }
 
-function goPage(delta: number) {
-  const next = page.value + delta
-  if (next < 1 || next > totalPagesSafe.value) return
-  page.value = next
-  fetchResources()
-  if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+function changeCategory(event: Event) {
+  const select = event.target as HTMLSelectElement
+  void updateQuery(keyword.value, select.value)
 }
 
 function refresh() {
-  fetchCatalog()
-  fetchResources()
+  void fetchCatalog()
+  void fetchResources()
 }
 
-onMounted(refresh)
+function focusSearch() {
+  if (route.hash === '#search') void nextTick(() => searchField.value?.focus({ preventScroll: true }))
+}
+
+watch([keyword, category, page], fetchResources)
+watch(keyword, (q) => { searchInput.value = q })
+watch(() => route.hash, focusSearch)
+onMounted(() => {
+  refresh()
+  focusSearch()
+})
 </script>
 
 <template>
-  <div class="container-app py-6 sm:py-8">
-    <!-- Resource service unavailable -->
-    <Alert v-if="serviceUnavailable">
-      <AlertDescription>
-        <span class="font-medium">NexusMC 资源服务暂不可用。</span>
-        请稍后重试或联系站点管理员，也可以
-        <a :href="NEXUSMC_SITE + '/resources'" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">前往 NexusMC 浏览资源</a>。
-      </AlertDescription>
-    </Alert>
+  <div class="container-app">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-content">
+        <p class="hero-kicker"><Box class="size-4" aria-hidden="true" /> Minecraft · Yes Steve Model</p>
+        <h1 id="hero-title">给方块世界<br /><span class="text-primary">换个新造型。</span></h1>
+        <p class="hero-description">探索玩家创作的 YSM 角色模型，前往 NexusMC 下载并带进你的 Minecraft 世界。</p>
 
-    <Alert v-else-if="error" variant="destructive">
-      <AlertDescription>
-        <span class="font-medium">加载失败。</span>
-        {{ error }}
-      </AlertDescription>
-    </Alert>
-
-    <!-- Toolbar：分类筛选 + 刷新；搜索在顶栏 -->
-    <div class="flex items-center justify-between gap-2" :class="serviceUnavailable || error ? 'mt-6' : ''">
-      <div v-if="keyword" class="flex min-w-0 items-center gap-2 text-sm">
-        <span class="truncate text-muted-foreground">搜索「{{ keyword }}」的结果</span>
-        <Button variant="ghost" size="sm" class="btn-press focus-ring shrink-0" @click="clearSearch">
-          清除
-        </Button>
+        <form id="search" role="search" class="hero-search" @submit.prevent="submitSearch">
+          <label for="model-search" class="sr-only">搜索模型名称</label>
+          <Search class="ml-3 size-5 shrink-0 text-muted-foreground sm:ml-4" aria-hidden="true" />
+          <input
+            id="model-search"
+            ref="searchField"
+            v-model="searchInput"
+            type="search"
+            :maxlength="MAX_QUERY_LENGTH"
+            placeholder="搜索模型名称"
+            class="min-w-0 flex-1 self-stretch bg-transparent px-2 sm:px-3"
+          />
+          <button type="submit" class="site-button site-button-primary shrink-0">搜索</button>
+        </form>
       </div>
-      <div class="flex items-center gap-2" :class="keyword ? '' : 'ml-auto'">
-        <select
-          v-if="categories.length"
-          v-model="activeCategory"
-          class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-ring"
-          @change="changeCategory"
-        >
-          <option value="">全部分类</option>
-          <option v-for="opt in categories" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="btn-press focus-ring"
-          aria-label="刷新"
-          :disabled="loading"
-          @click="refresh"
-        >
-          <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />
-        </Button>
-      </div>
-    </div>
+      <HeroArtwork />
+    </section>
 
-    <!-- Grid -->
-    <div
-      v-if="loading"
-      class="mt-6 grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-    >
-      <Skeleton v-for="i in 8" :key="i" class="h-64 rounded-xl" />
-    </div>
-
-    <div
-      v-else-if="items.length"
-      class="mt-6 grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-    >
-      <Card
-        v-for="item in items"
-        :key="item.id || item.slug || resourceTitle(item)"
-        class="overflow-hidden card-hover group"
-      >
-        <RouterLink :to="resourceDetailPath(item)" class="block focus-ring">
-          <div class="aspect-[4/3] w-full bg-muted overflow-hidden">
-            <ResourceCover
-              :cover="resourceCover(item)"
-              :title="resourceTitle(item)"
-              img-class="transition-transform duration-300 group-hover:scale-105"
-            />
+    <section id="resources" ref="resultsSection" class="catalog" aria-labelledby="catalog-title">
+      <div class="catalog-header">
+        <div class="min-w-0">
+          <h2 id="catalog-title" class="font-display text-[1.75rem] font-bold tracking-tight sm:text-[2rem]">模型资源</h2>
+          <div class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted-foreground" role="status">
+            <span v-if="loading">正在加载模型…</span>
+            <span v-else-if="error">查看 NexusMC 社区发布的 YSM 模型</span>
+            <span v-else-if="keyword" class="break-all">「{{ keyword }}」的搜索结果 · {{ numberFormat.format(total) }} 个</span>
+            <span v-else>共 {{ numberFormat.format(total) }} 个模型</span>
+            <button
+              v-if="keyword || category"
+              type="button"
+              class="inline-flex items-center gap-1 rounded-sm font-semibold text-primary hover:underline"
+              @click="updateQuery('', '')"
+            ><X class="size-3.5" aria-hidden="true" /> 清除筛选</button>
           </div>
-          <CardContent class="p-4">
-            <h3 class="font-semibold line-clamp-1 text-balance group-hover:text-primary transition-colors">
-              {{ resourceTitle(item) }}
-            </h3>
-            <p class="mt-1 text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">
-              {{ resourceDescription(item) || '暂无描述' }}
-            </p>
-            <div v-if="resourceTags(item).length" class="mt-3 flex flex-wrap gap-1.5">
-              <Badge v-for="tag in resourceTags(item)" :key="tag" variant="secondary" class="text-xs">
-                {{ tag }}
-              </Badge>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <select
+            v-if="categories.length || category"
+            :value="category"
+            class="site-select max-w-44"
+            aria-label="资源分类"
+            @change="changeCategory"
+          >
+            <option value="">全部分类</option>
+            <option v-if="category && !categories.some(option => option.value === category)" :value="category">{{ category }}</option>
+            <option v-for="option in categories" :key="option.value" :value="option.value">{{ option.label }}</option>
+          </select>
+          <button type="button" class="site-button site-button-outline site-button-icon" aria-label="刷新" :disabled="loading" @click="refresh">
+            <RefreshCw class="size-4" :class="{ 'animate-spin': loading }" aria-hidden="true" />
+          </button>
+          <a :href="NEXUSMC_SITE + '/resources/new'" target="_blank" rel="noopener noreferrer" class="site-button site-button-outline">
+            <Upload class="size-4" aria-hidden="true" /> 我要投稿
+          </a>
+        </div>
+      </div>
+
+      <div :aria-busy="loading">
+        <div v-if="loading" class="resource-grid" aria-hidden="true">
+          <div v-for="i in 4" :key="i" class="site-panel overflow-hidden">
+            <div class="aspect-[16/10] animate-pulse bg-muted" />
+            <div class="space-y-3 p-4">
+              <div class="h-4 w-2/3 animate-pulse rounded-sm bg-muted" />
+              <div class="h-3 w-full animate-pulse rounded-sm bg-muted" />
+              <div class="h-3 w-2/5 animate-pulse rounded-sm bg-muted" />
             </div>
-            <div class="mt-3 flex items-center justify-between">
-              <div class="flex items-center gap-3 text-xs text-muted-foreground">
-                <span v-if="resourceDownloads(item) !== undefined" class="inline-flex items-center gap-1">
-                  <Download class="h-3.5 w-3.5" />
-                  {{ resourceDownloads(item) }}
-                </span>
-                <span v-if="resourceViews(item) !== undefined" class="inline-flex items-center gap-1">
-                  <Eye class="h-3.5 w-3.5" />
-                  {{ resourceViews(item) }}
-                </span>
+          </div>
+        </div>
+
+        <div v-else-if="error" class="site-panel flex flex-wrap items-center gap-4 p-5 sm:p-6" role="alert">
+          <div class="status-icon"><CircleAlert class="size-[1.375rem]" aria-hidden="true" /></div>
+          <div class="min-w-52 flex-1">
+            <h3 class="font-bold">{{ error === 'offline' ? 'NexusMC 资源服务暂不可用' : '模型加载失败' }}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">请稍后重试，或直接前往 NexusMC 浏览资源。</p>
+          </div>
+          <a :href="NEXUSMC_SITE + '/resources'" target="_blank" rel="noopener noreferrer" class="site-button site-button-outline">
+            浏览 NexusMC <ArrowUpRight class="size-4" aria-hidden="true" />
+          </a>
+        </div>
+
+        <ul v-else-if="cards.length" class="resource-grid" aria-label="模型列表">
+          <li v-for="(card, index) in cards" :key="card.path || card.externalUrl || index" class="min-w-0">
+            <component
+              :is="card.path ? 'RouterLink' : card.externalUrl ? 'a' : 'article'"
+              :to="card.path || undefined"
+              :href="!card.path ? card.externalUrl || undefined : undefined"
+              :target="!card.path && card.externalUrl ? '_blank' : undefined"
+              :rel="!card.path && card.externalUrl ? 'noopener noreferrer' : undefined"
+              class="resource-card site-panel group flex h-full flex-col overflow-hidden"
+            >
+              <div class="aspect-[16/10] overflow-hidden border-b border-border bg-muted">
+                <ResourceCover :cover="card.cover" :title="card.title" />
               </div>
-              <span class="text-xs font-medium text-primary">查看详情 →</span>
-            </div>
-          </CardContent>
-        </RouterLink>
-      </Card>
-    </div>
+              <div class="flex flex-1 flex-col p-4">
+                <h3 class="line-clamp-2 text-[1.0625rem] font-bold group-hover:text-primary">{{ card.title }}</h3>
+                <p v-if="card.description" class="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{{ card.description }}</p>
+                <div v-if="card.tags.length" class="mt-3 flex flex-wrap gap-1.5">
+                  <span v-for="tag in card.tags" :key="tag" class="max-w-full truncate rounded-md bg-accent px-2 py-0.5 text-xs font-medium text-primary">{{ tag }}</span>
+                </div>
+                <div v-if="card.downloads || card.views || card.path || card.externalUrl" class="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-4 text-xs text-muted-foreground">
+                  <span v-if="card.downloads" class="inline-flex items-center gap-1"><Download class="size-3.5" aria-label="下载次数" />{{ card.downloads }}</span>
+                  <span v-if="card.views" class="inline-flex items-center gap-1"><Eye class="size-3.5" aria-label="浏览次数" />{{ card.views }}</span>
+                  <ArrowRight v-if="card.path" class="ml-auto size-4 text-primary" aria-hidden="true" />
+                  <ArrowUpRight v-else-if="card.externalUrl" class="ml-auto size-4 text-primary" aria-hidden="true" />
+                </div>
+              </div>
+            </component>
+          </li>
+        </ul>
 
-    <div v-else-if="!serviceUnavailable && !error" class="mt-16 text-center">
-      <p class="text-muted-foreground">暂无 YSM 模型资源。</p>
-      <p class="mt-2 text-sm text-muted-foreground/70">
-        新模型在 NexusMC 审核通过后会自动出现在这里，
-        <a :href="NEXUSMC_SITE + '/resources/new'" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">欢迎前往 NexusMC 投稿 →</a>
-      </p>
-    </div>
+        <div v-else class="site-panel flex flex-col items-center gap-3 px-5 py-9 text-center">
+          <div class="status-icon"><Box class="size-6" aria-hidden="true" /></div>
+          <h3 class="font-bold">{{ keyword || category ? '没有找到符合条件的模型' : '暂无 YSM 模型资源' }}</h3>
+          <p class="text-sm text-muted-foreground">{{ keyword || category ? '试试其他关键词，或清除筛选后重新浏览。' : 'NexusMC 审核通过的新模型会展示在这里。' }}</p>
+        </div>
 
-    <!-- Pagination -->
-    <div
-      v-if="!loading && items.length && totalPagesSafe > 1"
-      class="mt-8 flex items-center justify-center gap-4"
-    >
-      <Button
-        variant="outline"
-        size="sm"
-        class="btn-press focus-ring"
-        :disabled="page <= 1"
-        @click="goPage(-1)"
-      >
-        <ChevronLeft class="mr-1 h-4 w-4" />
-        上一页
-      </Button>
-      <span class="text-sm text-muted-foreground">第 {{ page }} / {{ totalPagesSafe }} 页 · 共 {{ total }} 个资源</span>
-      <Button
-        variant="outline"
-        size="sm"
-        class="btn-press focus-ring"
-        :disabled="page >= totalPagesSafe"
-        @click="goPage(1)"
-      >
-        下一页
-        <ChevronRight class="ml-1 h-4 w-4" />
-      </Button>
-    </div>
-
-    <!-- 底部引流 -->
-    <section class="mt-12 rounded-2xl border bg-muted/30 p-6 text-center sm:p-8">
-      <h2 class="text-lg font-semibold">在 NexusMC 获得完整体验</h2>
-      <p class="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-        登录收藏、社区互动、投稿分享——注册 NexusMC 账号，发现更多资源与玩法。
-      </p>
-      <div class="mt-4 flex flex-wrap items-center justify-center gap-3">
-        <a :href="NEXUSMC_SITE" target="_blank" rel="noopener noreferrer">
-          <Button class="btn-press focus-ring">打开 NexusMC</Button>
-        </a>
-        <a :href="NEXUSMC_REGISTER_URL" target="_blank" rel="noopener noreferrer">
-          <Button variant="outline" class="btn-press focus-ring">免费注册</Button>
-        </a>
+        <ResourcePagination
+          v-if="!loading && !error"
+          :page="page"
+          :total-pages="totalPages"
+          @change="updateQuery(keyword, category, $event, true)"
+        />
       </div>
     </section>
   </div>
 </template>
+
+<style scoped>
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(1.75rem, 5vw, 4.25rem);
+  padding-block: clamp(1.75rem, 5vw, 3.5rem);
+}
+
+.hero-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.hero h1 {
+  margin-top: 0.75rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.65rem, 5.3vw, 4.75rem);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.06em;
+}
+
+.hero-description {
+  max-width: 27rem;
+  margin-top: 1rem;
+  color: var(--color-muted-foreground);
+  font-size: clamp(0.9375rem, 1.45vw, 1.0625rem);
+  text-wrap: pretty;
+}
+
+.hero-search {
+  display: flex;
+  max-width: 29rem;
+  min-height: 3.375rem;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 0.3125rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.875rem;
+  background: var(--color-card);
+}
+
+.hero-search:focus-within {
+  border-color: var(--color-primary);
+  outline: 1px solid var(--color-primary);
+}
+
+.hero-search input:focus-visible {
+  outline: none;
+}
+
+.hero-search .site-button {
+  min-width: 4.875rem;
+}
+
+.catalog {
+  border-top: 1px solid var(--color-border);
+  padding-block: 1.75rem 3.75rem;
+}
+
+.catalog-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.875rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+}
+
+.resource-card:is(a):hover {
+  border-color: var(--color-primary);
+}
+
+@media (min-width: 800px) {
+  .hero {
+    grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  }
+}
+
+@media (max-width: 479px) {
+  .hero {
+    gap: 1.25rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.25rem, 11vw, 3.25rem);
+  }
+
+  .catalog {
+    padding-bottom: 2.25rem;
+  }
+
+  .resource-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+  }
+
+  .resource-card > div:last-child {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 359px) {
+  .resource-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

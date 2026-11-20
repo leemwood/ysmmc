@@ -23,10 +23,16 @@ export async function load(url, context, next) {
   let source = readFileSync(fileURLToPath(url), 'utf8')
   if (url.endsWith('.vue')) {
     const { descriptor } = parse(source, { filename: fileURLToPath(url) })
+    // 内存渲染器没有浏览器的 HTML 解析能力。
+    const compilerOptions = { hoistStatic: false }
     if (descriptor.script || descriptor.scriptSetup) {
-      source = compileScript(descriptor, { id: url, inlineTemplate: true }).content
+      source = compileScript(descriptor, {
+        id: url,
+        inlineTemplate: true,
+        templateOptions: { compilerOptions },
+      }).content
     } else {
-      source = compileTemplate({ source: descriptor.template.content, filename: url, id: url }).code
+      source = compileTemplate({ source: descriptor.template.content, filename: url, id: url, compilerOptions }).code
         + '\nexport default { render }'
     }
   }

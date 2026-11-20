@@ -1,118 +1,76 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { Button } from '@/components/ui/button'
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import { Download, X } from 'lucide-vue-next'
 
-const showPrompt = ref(false)
-const deferredPrompt = ref<any>(null)
+interface InstallPromptEvent extends Event {
+  prompt(): Promise<unknown>
+}
+
+const DISMISSED_KEY = 'pwa-prompt-dismissed'
+const deferredPrompt = shallowRef<InstallPromptEvent>()
 const isIOS = ref(false)
-const isStandalone = ref(false)
+const dismissed = ref(false)
+const standalone = ref(false)
+const visible = computed(() => !standalone.value && !dismissed.value && (isIOS.value || deferredPrompt.value))
 
-function checkIOS() {
-  const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent)
-  const isInStandaloneMode = ('standalone' in window.navigator) && 
-    (window.navigator as any).standalone
-  isIOS.value = isIOSDevice && !isInStandaloneMode
+function capturePrompt(event: Event) {
+  event.preventDefault()
+  deferredPrompt.value = event as InstallPromptEvent
 }
 
-function checkStandalone() {
-  isStandalone.value = window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as any).standalone === true
+async function install() {
+  const prompt = deferredPrompt.value
+  deferredPrompt.value = undefined
+  await prompt?.prompt().catch(() => {})
 }
 
-function handleBeforeInstallPrompt(e: Event) {
-  e.preventDefault()
-  deferredPrompt.value = e
-  if (!isStandalone.value) {
-    showPrompt.value = true
+function dismiss() {
+  dismissed.value = true
+  try {
+    localStorage.setItem(DISMISSED_KEY, 'true')
+  } catch {
+    // 隐私模式下仍可关闭当前提示。
   }
 }
 
-async function installPWA() {
-  if (!deferredPrompt.value) return
-  
-  showPrompt.value = false
-  deferredPrompt.value.prompt()
-  
-  const { outcome } = await deferredPrompt.value.userChoice
-  
-  if (outcome === 'accepted') {
-    console.log('PWA installed')
-  }
-  
-  deferredPrompt.value = null
-}
-
-function dismissPrompt() {
-  showPrompt.value = false
-  localStorage.setItem('pwa-prompt-dismissed', 'true')
+function handleInstalled() {
+  standalone.value = true
+  deferredPrompt.value = undefined
 }
 
 onMounted(() => {
-  checkIOS()
-  checkStandalone()
-  
-  window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-  
-  const dismissed = localStorage.getItem('pwa-prompt-dismissed')
-  if (dismissed) {
-    showPrompt.value = false
+  const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone
+  isIOS.value = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  standalone.value = iosStandalone === true || window.matchMedia('(display-mode: standalone)').matches
+  try {
+    dismissed.value = localStorage.getItem(DISMISSED_KEY) === 'true'
+  } catch {
+    // 无存储权限时保留当前会话的状态。
   }
+  window.addEventListener('beforeinstallprompt', capturePrompt)
+  window.addEventListener('appinstalled', handleInstalled)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+  window.removeEventListener('beforeinstallprompt', capturePrompt)
+  window.removeEventListener('appinstalled', handleInstalled)
 })
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition
-      enter-active-class="transition ease-out duration-300"
-      enter-from-class="transform translate-y-full opacity-0"
-      enter-to-class="transform translate-y-0 opacity-100"
-      leave-active-class="transition ease-in duration-200"
-      leave-from-class="transform translate-y-0 opacity-100"
-      leave-to-class="transform translate-y-full opacity-0"
-    >
-      <div v-if="showPrompt || isIOS">
-        <div class="fixed inset-0 z-20 bg-black/80 backdrop-blur-sm" @click="dismissPrompt" />
-        <div class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 z-30">
-          <div class="bg-card/95 backdrop-blur-md border rounded-lg shadow-lg p-4 pb-safe">
-            <div class="flex items-start justify-between gap-2">
-              <div class="flex-1">
-                <h3 class="font-semibold text-sm">安装 YSM 模型站</h3>
-                <p class="text-xs text-muted-foreground mt-1">
-                  <template v-if="isIOS">
-                    点击分享按钮，然后选择"添加到主屏幕"
-                  </template>
-                  <template v-else>
-                    安装到主屏幕，获得更好的体验
-                  </template>
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-6 w-6 flex-shrink-0"
-                @click="dismissPrompt"
-              >
-                <X class="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div v-if="!isIOS" class="mt-3 flex gap-2">
-              <Button size="sm" class="flex-1 btn-press" @click="installPWA">
-                <Download class="mr-1 h-4 w-4" />
-                安装
-              </Button>
-              <Button size="sm" variant="outline" @click="dismissPrompt">
-                稍后
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+  <aside
+    v-if="visible"
+    class="site-panel fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex items-start gap-3 p-4 shadow-lg sm:left-auto sm:w-88"
+    aria-labelledby="install-title"
+  >
+    <div class="status-icon"><Download class="size-5" aria-hidden="true" /></div>
+    <div class="min-w-0 flex-1">
+      <h2 id="install-title" class="font-bold">安装 YSM 模型站</h2>
+      <p v-if="isIOS" class="mt-1 text-sm text-muted-foreground">点击浏览器的共享按钮，再选择「添加到主屏幕」。</p>
+      <button v-else type="button" class="site-button site-button-primary mt-2.5" @click="install">添加到主屏幕</button>
+    </div>
+    <button type="button" class="site-button site-button-ghost site-button-icon size-8 min-h-8" aria-label="关闭安装提示" @click="dismiss">
+      <X class="size-4" aria-hidden="true" />
+    </button>
+  </aside>
 </template>

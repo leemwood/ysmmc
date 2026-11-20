@@ -1,27 +1,16 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-import { Button } from '@/components/ui/button'
-import { Home } from 'lucide-vue-next'
-
-const router = useRouter()
-
-function goHome() {
-  router.push({ name: 'home' })
-}
+import { ArrowLeft, Box } from 'lucide-vue-next'
 </script>
 
 <template>
-  <div class="container-app flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
-    <div class="surface w-full max-w-md animate-fade-in px-6 py-12 text-center">
-      <h1 class="text-8xl font-bold tracking-tighter gradient-text sm:text-9xl">404</h1>
-      <h2 class="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">页面未找到</h2>
-      <p class="mt-2 text-sm text-muted-foreground sm:text-base">
-        您访问的页面不存在或已被移除
-      </p>
-      <Button class="focus-ring btn-press mt-8" @click="goHome">
-        <Home class="mr-2 h-4 w-4" />
-        返回首页
-      </Button>
-    </div>
+  <div class="container-app flex min-h-[58vh] items-center justify-center py-8">
+    <section class="site-panel w-full max-w-md p-6 text-center sm:p-10">
+      <div class="status-icon mx-auto"><Box class="size-6" aria-hidden="true" /></div>
+      <h1 class="mt-4 text-2xl font-bold">页面未找到</h1>
+      <p class="mt-2 text-sm text-muted-foreground">这个地址可能已失效。你可以从模型库继续浏览。</p>
+      <RouterLink to="/" class="site-button site-button-primary mt-5">
+        <ArrowLeft class="size-4" aria-hidden="true" /> 返回模型库
+      </RouterLink>
+    </section>
   </div>
 </template>

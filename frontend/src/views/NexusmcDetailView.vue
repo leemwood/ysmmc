@@ -1,20 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Skeleton } from '@/components/ui/skeleton'
+import axios from 'axios'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, ArrowUpRight, CalendarDays, CircleAlert, Download, Eye, LogIn } from 'lucide-vue-next'
 import NexusmcAvatar from '@/components/NexusmcAvatar.vue'
 import ResourceCover from '@/components/ResourceCover.vue'
-import {
-  ArrowLeft,
-  Download,
-  Eye,
-  ExternalLink,
-  CalendarDays,
-} from 'lucide-vue-next'
 import {
   isNexusmcConfigError,
   NEXUSMC_SITE,
@@ -33,236 +23,224 @@ import { useNexusmcStore } from '@/stores/nexusmc'
 import { tiptapToHtml } from '@/utils/tiptap'
 
 const route = useRoute()
+const router = useRouter()
 const store = useNexusmcStore()
-
 const loading = ref(true)
-const error = ref('')
-const notFound = ref(false)
+const error = ref<'offline' | 'missing' | 'load' | ''>('')
 const item = ref<NexusmcResource | null>(null)
+const resourceId = computed(() => String(route.params.id ?? ''))
+let requestId = 0
 
-const resourceId = computed(() => String(route.params.id || ''))
-const pageUrl = computed(() => (item.value ? resourcePageUrl(item.value) : ''))
-const updatedAt = computed(() => {
-  const raw = item.value ? resourceUpdatedAt(item.value) : ''
-  if (!raw) return ''
-  const date = new Date(raw)
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('zh-CN')
+const catalogPath = computed(() => {
+  const previous = router.options.history.state.back
+  return typeof previous === 'string' && /^\/(?:[?#]|$)/.test(previous) ? previous : '/'
 })
-// TipTap 正文 → 受限 HTML；无正文时回退为简介
-const contentHtml = computed(() => {
-  if (!item.value) return ''
-  const raw = (item.value as Record<string, unknown>).content ?? (item.value as Record<string, unknown>).body
-  return tiptapToHtml(raw)
+
+const model = computed(() => {
+  if (!item.value) return null
+  const resource = item.value
+  const date = new Date(resourceUpdatedAt(resource))
+  const format = new Intl.NumberFormat('zh-CN')
+  const downloads = resourceDownloads(resource)
+  const views = resourceViews(resource)
+  return {
+    title: resourceTitle(resource),
+    description: resourceDescription(resource),
+    cover: resourceCover(resource),
+    tags: [...new Set(resourceTags(resource))],
+    downloads: downloads === undefined ? '' : format.format(downloads),
+    views: views === undefined ? '' : format.format(views),
+    updatedAt: Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('zh-CN'),
+    pageUrl: resourcePageUrl(resource) || `${NEXUSMC_SITE}/resources/${encodeURIComponent(resourceId.value)}`,
+    contentHtml: tiptapToHtml(resource.content ?? resource.body),
+  }
+})
+
+const errorMessage = computed(() => {
+  if (error.value === 'offline') return 'NexusMC 资源服务暂不可用'
+  if (error.value === 'missing') return '资源不存在或暂不可见'
+  return '模型详情加载失败'
 })
 
 async function fetchDetail() {
+  const currentRequest = ++requestId
   loading.value = true
   error.value = ''
-  notFound.value = false
+  item.value = null
+
   try {
     const { data } = await nexusmcApi.resource(resourceId.value)
-    const node = (data as Record<string, unknown>).resource ?? (data as Record<string, unknown>).item ?? data
-    if (node && typeof node === 'object' && (resourceTitle(node as NexusmcResource) || (node as NexusmcResource).page_url)) {
-      item.value = node as NexusmcResource
+    if (currentRequest !== requestId) return
+    const resource = data?.resource ?? data?.item ?? data
+    if (resource && typeof resource === 'object' && (resource.title || resource.name || resource.page_url)) {
+      item.value = resource
     } else {
-      notFound.value = true
+      error.value = 'missing'
     }
-  } catch (e) {
-    if (isNexusmcConfigError(e)) {
-      error.value = 'service_unavailable'
+  } catch (cause) {
+    if (currentRequest !== requestId) return
+    if (isNexusmcConfigError(cause)) {
+      error.value = 'offline'
+    } else if (axios.isAxiosError(cause) && [403, 404].includes(cause.response?.status ?? 0)) {
+      error.value = 'missing'
     } else {
-      notFound.value = true
+      error.value = 'load'
     }
   } finally {
-    loading.value = false
+    if (currentRequest === requestId) loading.value = false
   }
 }
 
-onMounted(fetchDetail)
+watch(resourceId, fetchDetail, { immediate: true })
 </script>
 
 <template>
-  <div class="container-app py-6 sm:py-8">
-    <Button variant="ghost" size="sm" class="btn-press focus-ring -ml-2" @click="$router.back()">
-      <ArrowLeft class="mr-1.5 h-4 w-4" />
-      返回资源列表
-    </Button>
+  <div class="container-app py-6 sm:py-9">
+    <RouterLink :to="catalogPath" class="inline-flex items-center gap-2 rounded-sm text-sm font-semibold text-muted-foreground hover:text-primary">
+      <ArrowLeft class="size-4" aria-hidden="true" /> 返回模型库
+    </RouterLink>
 
-    <!-- Loading -->
-    <div v-if="loading" class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-      <Skeleton class="aspect-[16/9] rounded-xl" />
-      <div class="space-y-4">
-        <Skeleton class="h-8 w-3/4" />
-        <Skeleton class="h-4 w-full" />
-        <Skeleton class="h-4 w-5/6" />
-        <Skeleton class="h-10 w-40" />
+    <div v-if="loading" class="mt-6" role="status">
+      <span class="sr-only">正在加载模型详情…</span>
+      <div class="mb-6 h-10 max-w-80 animate-pulse rounded-md bg-muted" aria-hidden="true" />
+      <div class="detail-grid" aria-hidden="true">
+        <div class="aspect-[16/10] animate-pulse rounded-2xl bg-muted" />
+        <div class="h-56 animate-pulse rounded-2xl bg-muted" />
       </div>
     </div>
 
-    <!-- Error / fallback：详情缺失时仍给出 NexusMC 出口，保证引流不中断 -->
-    <template v-else-if="notFound || error">
-      <Alert class="mt-6" :variant="error === 'service_unavailable' ? 'default' : 'destructive'">
-        <AlertDescription>
-          <template v-if="error === 'service_unavailable'">
-            <span class="font-medium">NexusMC 资源服务暂不可用。</span>
-            请稍后重试或联系站点管理员，也可直接前往 NexusMC 浏览资源。
-          </template>
-          <template v-else>
-            <span class="font-medium">未能获取资源详情。</span>
-            该资源可能已下架或暂不可见，你可以前往 NexusMC 搜索查看。
-          </template>
-        </AlertDescription>
-      </Alert>
-      <div class="mt-6 flex flex-wrap gap-3">
-        <a :href="`${NEXUSMC_SITE}/resources`" target="_blank" rel="noopener noreferrer">
-          <Button class="btn-press focus-ring">
-            <ExternalLink class="mr-1.5 h-4 w-4" />
-            前往 NexusMC 资源库
-          </Button>
-        </a>
-        <Button variant="outline" class="btn-press focus-ring" @click="$router.push('/')">
-          返回资源列表
-        </Button>
+    <section v-else-if="error" class="site-panel mt-6 flex flex-col items-start gap-4 p-6 sm:p-8" role="alert">
+      <div class="status-icon"><CircleAlert class="size-6" aria-hidden="true" /></div>
+      <div>
+        <h1 class="text-xl font-bold">{{ errorMessage }}</h1>
+        <p class="mt-1 text-sm text-muted-foreground">你也可以前往 NexusMC 查找这个资源。</p>
       </div>
-    </template>
+      <div class="flex flex-wrap gap-2">
+        <button v-if="error !== 'missing'" type="button" class="site-button site-button-primary" @click="fetchDetail">重试</button>
+        <a :href="`${NEXUSMC_SITE}/resources`" target="_blank" rel="noopener noreferrer" class="site-button site-button-outline">
+          浏览 NexusMC <ArrowUpRight class="size-4" aria-hidden="true" />
+        </a>
+      </div>
+    </section>
 
-    <!-- Detail -->
-    <div v-else-if="item" class="mt-4">
-      <div class="flex flex-col gap-6 lg:flex-row">
-        <!-- 封面 -->
-        <div class="lg:w-3/5">
-          <div class="aspect-[16/9] w-full overflow-hidden rounded-xl border bg-muted">
-            <ResourceCover
-              :cover="resourceCover(item)"
-              :title="resourceTitle(item)"
-              icon-class="h-12 w-12"
-            />
-          </div>
+    <article v-else-if="model" class="mt-5 pb-8">
+      <header class="mb-6 max-w-3xl">
+        <h1 class="font-display text-[clamp(2rem,4.5vw,3.5rem)] font-bold tracking-tight">{{ model.title }}</h1>
+        <p v-if="model.description" class="mt-3 whitespace-pre-line text-muted-foreground">{{ model.description }}</p>
+        <ul v-if="model.tags.length" class="mt-3 flex flex-wrap gap-1.5" aria-label="资源标签">
+          <li v-for="tag in model.tags" :key="tag" class="max-w-full truncate rounded-md bg-accent px-2 py-0.5 text-sm font-medium text-primary">{{ tag }}</li>
+        </ul>
+      </header>
+
+      <div class="detail-grid">
+        <div class="site-panel aspect-[16/10] overflow-hidden bg-muted">
+          <ResourceCover :cover="model.cover" :title="model.title" eager icon-class="size-12" />
         </div>
 
-        <!-- 信息与 CTA -->
-        <div class="flex flex-col lg:w-2/5">
-          <h1 class="text-xl font-bold tracking-tight sm:text-2xl">{{ resourceTitle(item) }}</h1>
-          <p v-if="resourceDescription(item)" class="mt-3 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-            {{ resourceDescription(item) }}
-          </p>
+        <aside class="site-panel p-5 sm:p-6" aria-labelledby="download-heading">
+          <div class="status-icon"><Download class="size-[1.375rem]" aria-hidden="true" /></div>
+          <h2 id="download-heading" class="mt-4 text-xl font-bold">下载模型</h2>
+          <p class="mt-1 text-sm text-muted-foreground">在 NexusMC 资源页获取模型文件和最新版本。</p>
+          <a :href="model.pageUrl" target="_blank" rel="noopener noreferrer" class="site-button site-button-primary mt-4 w-full">
+            前往 NexusMC 下载 <ArrowUpRight class="size-4" aria-hidden="true" />
+          </a>
 
-          <div v-if="resourceTags(item).length" class="mt-4 flex flex-wrap gap-1.5">
-            <Badge v-for="tag in resourceTags(item)" :key="tag" variant="secondary">{{ tag }}</Badge>
-          </div>
+          <dl v-if="model.downloads || model.views || model.updatedAt" class="mt-5 grid gap-2.5 border-t border-border pt-4 text-sm">
+            <div v-if="model.downloads" class="flex justify-between gap-3">
+              <dt class="inline-flex items-center gap-2 text-muted-foreground"><Download class="size-4" aria-hidden="true" /> 下载次数</dt>
+              <dd class="font-semibold tabular-nums">{{ model.downloads }}</dd>
+            </div>
+            <div v-if="model.views" class="flex justify-between gap-3">
+              <dt class="inline-flex items-center gap-2 text-muted-foreground"><Eye class="size-4" aria-hidden="true" /> 浏览次数</dt>
+              <dd class="font-semibold tabular-nums">{{ model.views }}</dd>
+            </div>
+            <div v-if="model.updatedAt" class="flex justify-between gap-3">
+              <dt class="inline-flex items-center gap-2 text-muted-foreground"><CalendarDays class="size-4" aria-hidden="true" /> 最近更新</dt>
+              <dd class="font-semibold">{{ model.updatedAt }}</dd>
+            </div>
+          </dl>
 
-          <div class="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            <span v-if="resourceDownloads(item) !== undefined" class="inline-flex items-center gap-1.5">
-              <Download class="h-4 w-4" />
-              {{ resourceDownloads(item) }} 次下载
-            </span>
-            <span v-if="resourceViews(item) !== undefined" class="inline-flex items-center gap-1.5">
-              <Eye class="h-4 w-4" />
-              {{ resourceViews(item) }} 次浏览
-            </span>
-            <span v-if="updatedAt" class="inline-flex items-center gap-1.5">
-              <CalendarDays class="h-4 w-4" />
-              更新于 {{ updatedAt }}
-            </span>
-          </div>
-
-          <!-- 核心引流 CTA -->
-          <div class="mt-6 rounded-xl border bg-primary/5 p-4">
-            <p class="text-sm font-medium">下载与更新都在 NexusMC 进行</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              点击前往 NexusMC 资源页获取最新版本；登录、收藏与评论同样在 NexusMC 完成。
-            </p>
-            <a v-if="pageUrl" :href="pageUrl" target="_blank" rel="noopener noreferrer" class="mt-3 block">
-              <Button size="lg" class="btn-press focus-ring w-full sm:w-auto">
-                <ExternalLink class="mr-2 h-4 w-4" />
-                前往 NexusMC 下载
-              </Button>
-            </a>
-          </div>
-
-          <!-- 登录状态 -->
-          <div class="mt-4 flex items-center gap-3 rounded-xl border p-3">
-            <template v-if="store.user">
-              <NexusmcAvatar size="xs" class="border" />
-              <div class="min-w-0 text-sm">
-                已以 <span class="font-medium">{{ store.displayName }}</span> 身份浏览，
-                <a :href="NEXUSMC_SITE" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">去 NexusMC 互动 →</a>
-              </div>
+          <div class="mt-5 flex flex-wrap items-center gap-2.5 border-t border-border pt-4">
+            <template v-if="store.isLoggedIn">
+              <NexusmcAvatar size="xs" />
+              <RouterLink to="/me" class="min-w-0 truncate rounded-sm text-sm font-semibold hover:text-primary">{{ store.displayName }}</RouterLink>
             </template>
             <template v-else>
-              <div class="min-w-0 flex-1 text-sm text-muted-foreground">
-                登录 NexusMC 后可收藏资源、参与评论。
-              </div>
-              <Button size="sm" variant="outline" class="btn-press focus-ring shrink-0" @click="store.login()">
-                登录
-              </Button>
+              <p class="grow text-sm text-muted-foreground">登录后可在 NexusMC 收藏和评论。</p>
+              <button type="button" class="site-button site-button-outline" @click="store.login(route.fullPath)">
+                <LogIn class="size-4" aria-hidden="true" /> 登录
+              </button>
             </template>
           </div>
-        </div>
-      </div>
+        </aside>
 
-      <!-- 详情正文（TipTap JSON 渲染为受限 HTML；纯文本原样展示） -->
-      <Card v-if="contentHtml" class="mt-8">
-        <CardContent class="nexusmc-article p-6" v-html="contentHtml" />
-      </Card>
-    </div>
+        <section v-if="model.contentHtml" class="site-panel min-w-0 p-5 sm:p-7" aria-labelledby="description-heading">
+          <h2 id="description-heading" class="mb-3 border-b border-border pb-3 text-xl font-bold">模型介绍</h2>
+          <div class="nexusmc-article" v-html="model.contentHtml" />
+        </section>
+      </div>
+    </article>
   </div>
 </template>
 
 <style scoped>
-.nexusmc-article :deep(p) {
-  margin: 0.75rem 0;
-  line-height: 1.8;
+.detail-grid {
+  display: grid;
+  align-items: start;
+  gap: 1.25rem;
 }
+
+.nexusmc-article {
+  overflow-wrap: anywhere;
+}
+
+.nexusmc-article :deep(p),
+.nexusmc-article :deep(ul),
+.nexusmc-article :deep(ol),
+.nexusmc-article :deep(blockquote),
+.nexusmc-article :deep(pre),
+.nexusmc-article :deep(img),
+.nexusmc-article :deep(hr) {
+  margin-block: 0.75rem;
+}
+
 .nexusmc-article :deep(h2),
 .nexusmc-article :deep(h3),
 .nexusmc-article :deep(h4) {
-  margin: 1.25rem 0 0.5rem;
-  font-weight: 600;
+  margin-top: 1.25rem;
+  font-weight: 700;
 }
+
 .nexusmc-article :deep(ul),
 .nexusmc-article :deep(ol) {
-  margin: 0.75rem 0;
-  padding-left: 1.5rem;
+  padding-inline-start: 1.5rem;
   list-style: revert;
 }
-.nexusmc-article :deep(li) {
-  margin: 0.25rem 0;
-  line-height: 1.7;
-}
-.nexusmc-article :deep(img) {
-  max-width: 100%;
-  height: auto;
-  border-radius: 0.5rem;
-  margin: 0.75rem 0;
-}
+
 .nexusmc-article :deep(blockquote) {
-  border-left: 3px solid var(--border);
-  padding-left: 1rem;
-  margin: 0.75rem 0;
-  color: var(--muted-foreground);
+  border-inline-start: 3px solid var(--color-border);
+  padding-inline-start: 1rem;
+  color: var(--color-muted-foreground);
 }
+
 .nexusmc-article :deep(pre) {
-  background: var(--muted);
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
   overflow-x: auto;
+  border-radius: 0.5rem;
+  background: var(--color-muted);
+  padding: 0.75rem 1rem;
   font-size: 0.875rem;
 }
-.nexusmc-article :deep(code) {
-  font-size: 0.875em;
-}
+
 .nexusmc-article :deep(a) {
-  color: var(--primary);
+  color: var(--color-primary);
   text-decoration: underline;
   text-underline-offset: 2px;
-  overflow-wrap: anywhere;
 }
-.nexusmc-article :deep(a:hover) {
-  opacity: 0.85;
-}
-.nexusmc-article :deep(hr) {
-  border-color: var(--border);
-  margin: 1rem 0;
+
+@media (min-width: 850px) {
+  .detail-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+    gap: 1.5rem;
+  }
 }
 </style>
