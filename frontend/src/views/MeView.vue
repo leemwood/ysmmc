@@ -245,7 +245,7 @@ onMounted(() => {
           </nav>
         </aside>
 
-        <section class="min-w-0" aria-labelledby="me-list-title" :aria-busy="activeState.loading">
+        <section :key="activeTab" class="enter-content min-w-0" aria-labelledby="me-list-title" :aria-busy="activeState.loading">
           <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 id="me-list-title" class="text-xl font-bold">{{ selectedTab.label }}</h2>
             <select
@@ -358,6 +358,13 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.125rem;
+}
+
+@media (max-width: 479px) {
+  .account-nav > button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
 }
 
 @media (min-width: 800px) {

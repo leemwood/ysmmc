@@ -20,8 +20,8 @@ const options = [
         <Monitor v-else class="size-[1.125rem]" aria-hidden="true" />
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" :side-offset="8" class="w-36 rounded-xl p-1.5">
-      <DropdownMenuItem v-for="option in options" :key="option.value" class="gap-2" @select="setTheme(option.value)">
+    <DropdownMenuContent align="end" :side-offset="8" class="enter-content w-36 rounded-xl p-1.5">
+      <DropdownMenuItem v-for="option in options" :key="option.value" class="gap-2 max-sm:min-h-11" @select="setTheme(option.value)">
         <component :is="option.icon" class="size-4" aria-hidden="true" />
         {{ option.label }}
         <Check v-if="theme === option.value" class="ml-auto size-4 text-primary" aria-label="当前主题" />

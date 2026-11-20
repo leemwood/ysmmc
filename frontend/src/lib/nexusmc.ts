@@ -69,10 +69,11 @@ export function isNexusmcConfigError(error: unknown): boolean {
 export const nexusmcApi = {
   config: () => api.get<{ configured: boolean; oauth_configured: boolean; auth_start: string }>('/config'),
   catalog: (platform?: string) => api.get('/catalog', { params: platform ? { platform } : {} }),
-  resources: (params: Record<string, string | number | undefined>) => api.get<NexusmcListResponse>('/resources', { params }),
+  resources: (params: Record<string, string | number | undefined>, signal?: AbortSignal) =>
+    api.get<NexusmcListResponse>('/resources', { params, signal }),
   resource: (id: string) => api.get('/resource', { params: { id } }),
-  search: (q: string, params: Record<string, string | number | undefined> = {}) =>
-    api.get<NexusmcListResponse>('/search', { params: { q, ...params } }),
+  search: (q: string, params: Record<string, string | number | undefined> = {}, signal?: AbortSignal) =>
+    api.get<NexusmcListResponse>('/search', { params: { q, ...params }, signal }),
 }
 
 // --- OAuth 用户数据（/me/*，需登录，token 由服务端 httpOnly cookie 持有） ----

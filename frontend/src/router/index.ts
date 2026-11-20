@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { updatePageMetadata } from '@/lib/pageMetadata'
 
 // 本站定位：NexusMC 资源展示与引流站。登录注册、用户体系均由 NexusMC 承载，
 // 本站不设本地账号，因此无需路由守卫。
@@ -42,10 +43,14 @@ const router = createRouter({
     if (savedPosition) return savedPosition
     if (to.hash === '#search' || to.hash === '#resources') {
       const el = document.getElementById(to.hash.slice(1))
-      if (el) return { el, top: 92 }
+      if (el) return { el, top: (document.querySelector('header')?.offsetHeight ?? 0) + 12 }
     }
     if (to.path !== from.path) return { top: 0 }
   },
+})
+
+router.afterEach((to, _from, failure) => {
+  if (!failure) updatePageMetadata(to)
 })
 
 export default router

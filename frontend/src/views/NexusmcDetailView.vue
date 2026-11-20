@@ -21,6 +21,7 @@ import {
 } from '@/lib/nexusmc'
 import { useNexusmcStore } from '@/stores/nexusmc'
 import { tiptapToHtml } from '@/utils/tiptap'
+import { updatePageMetadata } from '@/lib/pageMetadata'
 
 const route = useRoute()
 const router = useRouter()
@@ -92,6 +93,11 @@ async function fetchDetail() {
 }
 
 watch(resourceId, fetchDetail, { immediate: true })
+watch([model, error, () => route.fullPath], ([resource, failure]) => {
+  if (route.name === 'nexusmc-resource' && (resource || failure === 'missing')) {
+    updatePageMetadata(route, resource ?? undefined, failure === 'missing')
+  }
+})
 </script>
 
 <template>

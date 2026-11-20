@@ -9,6 +9,13 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 
 const store = useNexusmcStore()
 const route = useRoute()
+
+function focusHomeSearch() {
+  if (route.name !== 'home') return
+  const input = document.getElementById('model-search')
+  input?.scrollIntoView({ block: 'center' })
+  input?.focus({ preventScroll: true })
+}
 </script>
 
 <template>
@@ -34,10 +41,10 @@ const route = useRoute()
 
       <div class="flex shrink-0 items-center gap-0.5 sm:gap-2">
         <RouterLink
-          v-if="route.name !== 'home'"
-          :to="{ path: '/', hash: '#search' }"
+          :to="{ path: '/', query: route.name === 'home' ? route.query : {}, hash: '#search' }"
           class="site-button site-button-ghost site-button-icon"
           aria-label="搜索模型"
+          @click="focusHomeSearch"
         ><Search class="size-[1.125rem]" aria-hidden="true" /></RouterLink>
         <ThemeToggle />
         <DropdownMenu>
@@ -58,7 +65,7 @@ const route = useRoute()
               </template>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" :side-offset="8" class="w-48 rounded-xl p-1.5">
+          <DropdownMenuContent align="end" :side-offset="8" class="enter-content w-48 rounded-xl p-1.5 max-sm:[&_[role=menuitem]]:min-h-11">
             <template v-if="store.isLoggedIn">
               <DropdownMenuItem as-child>
                 <RouterLink to="/me" class="gap-2"><UserRound class="size-4" />个人主页</RouterLink>
